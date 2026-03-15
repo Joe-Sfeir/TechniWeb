@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus } from "lucide-react";
+import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus } from "lucide-react";
 import { getToken, getRole, clearAuth } from "../lib/auth";
 
 import { API_URL } from "../config";
@@ -9,32 +9,40 @@ const API_BASE = API_URL;
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const CLR = {
-  bg: "#080c14",
-  surface: "rgba(255,255,255,0.03)",
-  border: "rgba(255,255,255,0.07)",
-  accent: "#00d4ff",
-  accentDim: "rgba(0,212,255,0.12)",
-  text: "#dde3ed",
-  muted: "#5a6475",
-  danger: "#ef4444",
-  amber: "#f59e0b",
-  green: "#22c55e",
-  sidebar: "rgba(255,255,255,0.025)",
+  bg:        "#f1f5f9",
+  surface:   "#ffffff",
+  border:    "#e2e8f0",
+  accent:    "#2563eb",
+  accentDim: "#eff6ff",
+  text:      "#0f172a",
+  muted:     "#64748b",
+  muted2:    "#94a3b8",
+  danger:    "#dc2626",
+  dangerBg:  "#fef2f2",
+  dangerBdr: "#fecaca",
+  amber:     "#d97706",
+  amberBg:   "#fffbeb",
+  amberBdr:  "#fde68a",
+  green:     "#16a34a",
+  greenBg:   "#f0fdf4",
+  greenBdr:  "#bbf7d0",
+  sidebar:   "#ffffff",
 };
 
-const glass = (extra?: CSSProperties): CSSProperties => ({
-  background: "rgba(255,255,255,0.04)",
-  backdropFilter: "blur(16px)",
-  WebkitBackdropFilter: "blur(16px)",
+const card = (extra?: CSSProperties): CSSProperties => ({
+  background: "#ffffff",
   border: `1px solid ${CLR.border}`,
   borderRadius: 12,
+  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
   ...extra,
 });
 
 const DOT_GRID = `
+  *,*::before,*::after { box-sizing: border-box; }
+  body { margin: 0; }
   .admin-bg {
     background-color: ${CLR.bg};
-    background-image: radial-gradient(circle, rgba(0,212,255,0.07) 1px, transparent 1px);
+    background-image: radial-gradient(circle, rgba(37,99,235,0.06) 1px, transparent 1px);
     background-size: 28px 28px;
   }
   @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
@@ -77,39 +85,45 @@ interface LicenseResult {
 
 // ─── Demo Data ────────────────────────────────────────────────────────────────
 const DEMO_PROJECTS: Project[] = [
-  { id: "p1", name: "HVAC Complex A", client: "Al Noor Contracting", tier: 2, status: "online",  device_count: 6,  last_seen: "just now" },
-  { id: "p2", name: "Data Center UPS", client: "TechCo Systems",     tier: 3, status: "online",  device_count: 12, last_seen: "2 min ago" },
-  { id: "p3", name: "Substation Grid", client: "Emirates Power",     tier: 1, status: "warning", device_count: 4,  last_seen: "8 min ago" },
-  { id: "p4", name: "Mall Main Incomer",client:"ReedSpace Group",    tier: 2, status: "offline", device_count: 3,  last_seen: "1 hr ago" },
-  { id: "p5", name: "Factory Line B",  client: "Gulf Mfg Ltd",       tier: 1, status: "online",  device_count: 8,  last_seen: "just now" },
+  { id: "p1", name: "HVAC Complex A",   client: "Al Noor Contracting", tier: 2, status: "online",  device_count: 6,  last_seen: "just now"  },
+  { id: "p2", name: "Data Center UPS",  client: "TechCo Systems",      tier: 3, status: "online",  device_count: 12, last_seen: "2 min ago" },
+  { id: "p3", name: "Substation Grid",  client: "Emirates Power",      tier: 1, status: "warning", device_count: 4,  last_seen: "8 min ago" },
+  { id: "p4", name: "Mall Main Incomer",client: "ReedSpace Group",      tier: 2, status: "offline", device_count: 3,  last_seen: "1 hr ago"  },
+  { id: "p5", name: "Factory Line B",   client: "Gulf Mfg Ltd",         tier: 1, status: "online",  device_count: 8,  last_seen: "just now"  },
 ];
 
 const DEMO_USERS: User[] = [
-  { id: "u1", email: "ali@alnoor.ae",    name: "Ali Hassan",    role: "CLIENT",     company: "Al Noor Contracting", reset_requested: false, last_login: "Today 09:14",  project_count: 2 },
-  { id: "u2", email: "john@techco.com",  name: "John Smith",    role: "CLIENT",     company: "TechCo Systems",      reset_requested: true,  last_login: "Yesterday",     project_count: 1 },
-  { id: "u3", email: "sara@ep.ae",       name: "Sara Ahmed",    role: "CLIENT",     company: "Emirates Power",      reset_requested: false, last_login: "3 days ago",    project_count: 3 },
-  { id: "u4", email: "admin@technicat.com", name: "Admin User", role: "SUB_MASTER", company: "Technicat Group",     reset_requested: false, last_login: "Today 08:00",   project_count: 0 },
+  { id: "u1", email: "ali@alnoor.ae",      name: "Ali Hassan",    role: "CLIENT",     company: "Al Noor Contracting", reset_requested: false, last_login: "Today 09:14",  project_count: 2 },
+  { id: "u2", email: "john@techco.com",    name: "John Smith",    role: "CLIENT",     company: "TechCo Systems",      reset_requested: true,  last_login: "Yesterday",     project_count: 1 },
+  { id: "u3", email: "sara@ep.ae",         name: "Sara Ahmed",    role: "CLIENT",     company: "Emirates Power",      reset_requested: false, last_login: "3 days ago",    project_count: 3 },
+  { id: "u4", email: "admin@technicat.com",name: "Admin User",    role: "SUB_MASTER", company: "Technicat Group",     reset_requested: false, last_login: "Today 08:00",   project_count: 0 },
 ];
 
 const METER_OPTIONS = [
   { id: "schneider_pm2220", label: "Schneider PM2220" },
-  { id: "socomec",          label: "Socomec" },
-  { id: "custom",           label: "Custom" },
-  { id: "simulation",       label: "Simulation" },
-  { id: "email_alerts",     label: "Email Alerts" },
-  { id: "diagnostics",      label: "Diagnostics" },
+  { id: "socomec",          label: "Socomec"           },
+  { id: "custom",           label: "Custom"            },
+  { id: "simulation",       label: "Simulation"        },
+  { id: "email_alerts",     label: "Email Alerts"      },
+  { id: "diagnostics",      label: "Diagnostics"       },
 ];
 
 const STATUS_DOT: Record<string, string> = {
   online:  CLR.green,
-  offline: CLR.muted,
+  offline: CLR.muted2,
   warning: CLR.amber,
+};
+
+const STATUS_BG: Record<string, string> = {
+  online:  CLR.greenBg,
+  offline: "#f8fafc",
+  warning: CLR.amberBg,
 };
 
 const TIER_COLOR: Record<number, string> = {
   1: "#6366f1",
-  2: CLR.accent,
-  3: CLR.amber,
+  2: "#2563eb",
+  3: "#d97706",
 };
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -125,17 +139,17 @@ function Spinner() {
 
 function SectionHeader({ title, sub }: { title: string; sub?: string }) {
   return (
-    <div style={{ marginBottom: 20 }}>
-      <div style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 20, color: CLR.text, letterSpacing: "0.05em" }}>{title}</div>
-      {sub && <div style={{ fontSize: 12, color: CLR.muted, marginTop: 3 }}>{sub}</div>}
+    <div style={{ marginBottom: 24 }}>
+      <h2 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 20, color: CLR.text, letterSpacing: "-0.02em", margin: 0 }}>{title}</h2>
+      {sub && <p style={{ fontSize: 13, color: CLR.muted, marginTop: 4, marginBottom: 0 }}>{sub}</p>}
     </div>
   );
 }
 
 function DemoBanner() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", borderRadius: 8, marginBottom: 20, fontSize: 12, color: CLR.amber }}>
-      <span style={{ fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.08em" }}>DEMO MODE</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: CLR.amberBg, border: `1px solid ${CLR.amberBdr}`, borderRadius: 8, marginBottom: 20, fontSize: 13 }}>
+      <span style={{ fontWeight: 600, color: CLR.amber }}>Demo mode</span>
       <span style={{ color: CLR.muted }}>— backend offline, showing sample data</span>
     </div>
   );
@@ -144,12 +158,12 @@ function DemoBanner() {
 // ─── Fleet Tab ────────────────────────────────────────────────────────────────
 function FleetTab() {
   const navigate = useNavigate();
-  const [projects,    setProjects]    = useState<Project[]>([]);
-  const [users,       setUsers]       = useState<User[]>([]);
-  const [demo,        setDemo]        = useState(false);
-  const [loading,     setLoading]     = useState(true);
-  const [assignSel,   setAssignSel]   = useState<Record<string, string>>({});
-  const [assigning,   setAssigning]   = useState<Record<string, boolean>>({});
+  const [projects,  setProjects]  = useState<Project[]>([]);
+  const [users,     setUsers]     = useState<User[]>([]);
+  const [demo,      setDemo]      = useState(false);
+  const [loading,   setLoading]   = useState(true);
+  const [assignSel, setAssignSel] = useState<Record<string, string>>({});
+  const [assigning, setAssigning] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const token = getToken();
@@ -185,7 +199,6 @@ function FleetTab() {
       if (!res.ok) throw new Error("assign failed");
       setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, user_id: userId } : p));
     } catch {
-      // demo: optimistically update anyway
       setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, user_id: userId } : p));
     } finally {
       setAssigning((prev) => ({ ...prev, [projectId]: false }));
@@ -197,28 +210,31 @@ function FleetTab() {
   const assigned   = projects.filter((p) => p.user_id != null);
   const unassigned = projects.filter((p) => p.user_id == null);
 
-  const projectTableRows = (rows: Project[]) =>
-    rows.map((p, i) => (
-      <tr key={p.id} style={{ borderBottom: `1px solid ${CLR.border}`, background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
-        <td style={{ padding: "12px 12px", color: CLR.text, fontWeight: 500 }}>{p.name}</td>
-        <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.client}</td>
-        <td style={{ padding: "12px 12px" }}>
-          <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}18`, padding: "2px 8px", borderRadius: 4 }}>
+  const thStyle: CSSProperties = { textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", borderBottom: `1px solid ${CLR.border}`, background: "#f8fafc" };
+  const tdStyle: CSSProperties = { padding: "12px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9` };
+
+  const projectRows = (rows: Project[]) =>
+    rows.map((p) => (
+      <tr key={p.id}>
+        <td style={{ ...tdStyle, fontWeight: 500 }}>{p.name}</td>
+        <td style={{ ...tdStyle, color: CLR.muted }}>{p.client}</td>
+        <td style={tdStyle}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}14`, padding: "2px 8px", borderRadius: 5, border: `1px solid ${TIER_COLOR[p.tier] ?? CLR.muted}28` }}>
             TIER {p.tier}
           </span>
         </td>
-        <td style={{ padding: "12px 12px" }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 6, color: CLR.text }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_DOT[p.status] ?? CLR.muted, flexShrink: 0 }} />
+        <td style={tdStyle}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: STATUS_DOT[p.status], background: STATUS_BG[p.status], padding: "3px 9px", borderRadius: 20, border: `1px solid ${STATUS_DOT[p.status]}30` }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: STATUS_DOT[p.status], flexShrink: 0 }} />
             {p.status}
           </span>
         </td>
-        <td style={{ padding: "12px 12px", color: CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{p.device_count}</td>
-        <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.last_seen}</td>
-        <td style={{ padding: "12px 12px" }}>
+        <td style={{ ...tdStyle, color: CLR.muted }}>{p.device_count}</td>
+        <td style={{ ...tdStyle, color: CLR.muted }}>{p.last_seen}</td>
+        <td style={tdStyle}>
           <button
             onClick={() => navigate(`/dashboard/${p.id}`, { state: { from: "/admin" } })}
-            style={{ display: "flex", alignItems: "center", gap: 5, background: CLR.accentDim, border: `1px solid rgba(0,212,255,0.2)`, borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontWeight: 600, letterSpacing: "0.04em" }}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, background: CLR.accentDim, border: `1px solid #bfdbfe`, borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontWeight: 600 }}
           >
             <ExternalLink size={11} /> View
           </button>
@@ -226,98 +242,104 @@ function FleetTab() {
       </tr>
     ));
 
-  const tableHead = (cols: string[]) => (
-    <thead>
-      <tr style={{ borderBottom: `1px solid ${CLR.border}` }}>
-        {cols.map((h) => (
-          <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
-        ))}
-      </tr>
-    </thead>
-  );
-
   return (
     <div className="admin-fade">
-      <SectionHeader title="GLOBAL FLEET" sub={`${projects.length} active projects across all clients`} />
+      <SectionHeader title="Global Fleet" sub={`${projects.length} active projects across all clients`} />
       {demo && <DemoBanner />}
 
-      {/* Assigned projects */}
+      {/* Assigned */}
       {assigned.length > 0 && (
-        <div style={{ overflowX: "auto", marginBottom: 32 }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif", fontSize: 13 }}>
-            {tableHead(["Project", "Client", "Tier", "Status", "Devices", "Last Seen", ""])}
-            <tbody>{projectTableRows(assigned)}</tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Unassigned projects */}
-      {unassigned.length > 0 && (
-        <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-            <span style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 13, color: CLR.amber, letterSpacing: "0.08em", textTransform: "uppercase" }}>Unassigned Projects</span>
-            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 10, color: CLR.amber, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.25)", padding: "1px 8px", borderRadius: 4 }}>{unassigned.length}</span>
-          </div>
+        <div style={{ ...card(), overflow: "hidden", marginBottom: 28 }}>
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif", fontSize: 13 }}>
-              {tableHead(["Project", "Client", "Tier", "Status", "Devices", "Last Seen", "", "Assign To", ""])}
-              <tbody>
-                {unassigned.map((p, i) => (
-                  <tr key={p.id} style={{ borderBottom: `1px solid ${CLR.border}`, background: i % 2 === 0 ? "rgba(245,158,11,0.02)" : "rgba(245,158,11,0.04)" }}>
-                    <td style={{ padding: "12px 12px", color: CLR.text, fontWeight: 500 }}>{p.name}</td>
-                    <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.client}</td>
-                    <td style={{ padding: "12px 12px" }}>
-                      <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}18`, padding: "2px 8px", borderRadius: 4 }}>
-                        TIER {p.tier}
-                      </span>
-                    </td>
-                    <td style={{ padding: "12px 12px" }}>
-                      <span style={{ display: "flex", alignItems: "center", gap: 6, color: CLR.text }}>
-                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_DOT[p.status] ?? CLR.muted, flexShrink: 0 }} />
-                        {p.status}
-                      </span>
-                    </td>
-                    <td style={{ padding: "12px 12px", color: CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{p.device_count}</td>
-                    <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.last_seen}</td>
-                    <td style={{ padding: "12px 12px" }}>
-                      <button
-                        onClick={() => navigate(`/dashboard/${p.id}`, { state: { from: "/admin" } })}
-                        style={{ display: "flex", alignItems: "center", gap: 5, background: CLR.accentDim, border: `1px solid rgba(0,212,255,0.2)`, borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontWeight: 600, letterSpacing: "0.04em" }}
-                      >
-                        <ExternalLink size={11} /> View
-                      </button>
-                    </td>
-                    <td style={{ padding: "12px 12px" }}>
-                      <select
-                        value={assignSel[p.id] ?? ""}
-                        onChange={(e) => setAssignSel((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                        style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CLR.border}`, background: "rgba(255,255,255,0.05)", color: assignSel[p.id] ? CLR.text : CLR.muted, fontSize: 12, outline: "none", cursor: "pointer", minWidth: 160 }}
-                      >
-                        <option value="" disabled>Select client…</option>
-                        {users.map((u) => (
-                          <option key={u.id} value={u.id}>{u.email}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td style={{ padding: "12px 12px" }}>
-                      <button
-                        disabled={!assignSel[p.id] || assigning[p.id]}
-                        onClick={() => assign(p.id)}
-                        style={{ display: "flex", alignItems: "center", gap: 5, background: assignSel[p.id] ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${assignSel[p.id] ? "rgba(245,158,11,0.35)" : CLR.border}`, borderRadius: 6, padding: "5px 12px", color: assignSel[p.id] ? CLR.amber : CLR.muted, fontSize: 12, cursor: assignSel[p.id] ? "pointer" : "not-allowed", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap" }}
-                      >
-                        {assigning[p.id] ? <Spinner /> : "Assign"}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
+              <thead>
+                <tr>
+                  {["Project", "Client", "Tier", "Status", "Devices", "Last Seen", ""].map((h) => (
+                    <th key={h} style={thStyle}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>{projectRows(assigned)}</tbody>
             </table>
           </div>
         </div>
       )}
 
+      {/* Unassigned */}
+      {unassigned.length > 0 && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <span style={{ fontWeight: 700, fontSize: 13, color: CLR.amber, letterSpacing: "0.04em" }}>Unassigned Projects</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: CLR.amber, background: CLR.amberBg, border: `1px solid ${CLR.amberBdr}`, padding: "1px 8px", borderRadius: 4 }}>{unassigned.length}</span>
+          </div>
+          <div style={{ ...card(), overflow: "hidden" }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
+                <thead>
+                  <tr>
+                    {["Project", "Client", "Tier", "Status", "Devices", "Last Seen", "", "Assign To", ""].map((h) => (
+                      <th key={h} style={{ ...thStyle, background: "#fffbeb" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {unassigned.map((p) => (
+                    <tr key={p.id} style={{ background: "#fffdf5" }}>
+                      <td style={{ ...tdStyle, fontWeight: 500 }}>{p.name}</td>
+                      <td style={{ ...tdStyle, color: CLR.muted }}>{p.client}</td>
+                      <td style={tdStyle}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}14`, padding: "2px 8px", borderRadius: 5, border: `1px solid ${TIER_COLOR[p.tier] ?? CLR.muted}28` }}>
+                          TIER {p.tier}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: STATUS_DOT[p.status], background: STATUS_BG[p.status], padding: "3px 9px", borderRadius: 20, border: `1px solid ${STATUS_DOT[p.status]}30` }}>
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: STATUS_DOT[p.status], flexShrink: 0 }} />
+                          {p.status}
+                        </span>
+                      </td>
+                      <td style={{ ...tdStyle, color: CLR.muted }}>{p.device_count}</td>
+                      <td style={{ ...tdStyle, color: CLR.muted }}>{p.last_seen}</td>
+                      <td style={tdStyle}>
+                        <button
+                          onClick={() => navigate(`/dashboard/${p.id}`, { state: { from: "/admin" } })}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, background: CLR.accentDim, border: "1px solid #bfdbfe", borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+                        >
+                          <ExternalLink size={11} /> View
+                        </button>
+                      </td>
+                      <td style={tdStyle}>
+                        <select
+                          value={assignSel[p.id] ?? ""}
+                          onChange={(e) => setAssignSel((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                          style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: assignSel[p.id] ? CLR.text : CLR.muted, fontSize: 13, outline: "none", cursor: "pointer", minWidth: 160 }}
+                        >
+                          <option value="" disabled>Select client…</option>
+                          {users.map((u) => (
+                            <option key={u.id} value={u.id}>{u.email}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td style={tdStyle}>
+                        <button
+                          disabled={!assignSel[p.id] || assigning[p.id]}
+                          onClick={() => assign(p.id)}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, background: assignSel[p.id] ? CLR.amberBg : "#f8fafc", border: `1px solid ${assignSel[p.id] ? CLR.amberBdr : CLR.border}`, borderRadius: 6, padding: "5px 12px", color: assignSel[p.id] ? CLR.amber : CLR.muted, fontSize: 12, cursor: assignSel[p.id] ? "pointer" : "not-allowed", fontWeight: 700, whiteSpace: "nowrap" }}
+                        >
+                          {assigning[p.id] ? <Spinner /> : "Assign"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       {projects.length === 0 && (
-        <div style={{ ...glass(), padding: 32, textAlign: "center", color: CLR.muted, fontSize: 13 }}>
+        <div style={{ ...card(), padding: 32, textAlign: "center", color: CLR.muted, fontSize: 13 }}>
           No projects found.
         </div>
       )}
@@ -352,7 +374,6 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
       setDone(true);
       onSuccess(user.id);
     } catch {
-      // demo fallback — proceed anyway
       setDone(true);
       onSuccess(user.id);
     } finally {
@@ -366,53 +387,55 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
 
   const inputStyle: CSSProperties = {
     width: "100%", padding: "10px 12px", borderRadius: 8,
-    border: `1px solid ${CLR.border}`, background: "rgba(255,255,255,0.05)",
+    border: `1px solid ${CLR.border}`, background: "#f8fafc",
     color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
     fontFamily: "'Inter',sans-serif",
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
-      <div style={{ ...glass(), padding: 36, maxWidth: 440, width: "90%", position: "relative" }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)" }}>
+      <div style={{ ...card({ padding: 36, maxWidth: 440, width: "90%", position: "relative", borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }) }}>
         <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", color: CLR.muted, cursor: "pointer" }}>
           <X size={18} />
         </button>
 
-        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 18, color: CLR.text, letterSpacing: "0.06em", marginBottom: 4 }}>SET PASSWORD</div>
-        <div style={{ fontSize: 12, color: CLR.muted, marginBottom: 24 }}>{user.name} · {user.email}</div>
+        <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 18, color: CLR.text, marginBottom: 4 }}>Set Password</div>
+        <div style={{ fontSize: 13, color: CLR.muted, marginBottom: 24 }}>{user.name} · {user.email}</div>
 
         {!done ? (
           <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>New Password</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>New Password</label>
               <input type="text" value={newPass} onChange={(e) => setNewPass(e.target.value)} required placeholder="Enter new password" style={inputStyle} autoFocus />
             </div>
             <div>
-              <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Confirm Password</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Confirm Password</label>
               <input type="text" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} required placeholder="Repeat password" style={inputStyle} />
             </div>
-            {error && <div style={{ padding: "8px 12px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{error}</div>}
+            {error && (
+              <div style={{ padding: "9px 12px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{error}</div>
+            )}
             <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
-              <button type="submit" disabled={loading} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 8, background: "linear-gradient(135deg, #00d4ff, #0099bb)", border: "none", color: "#000", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: "0.06em", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}>
-                {loading ? <Spinner /> : <><Check size={14} /> SET PASSWORD</>}
+              <button type="submit" disabled={loading} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 8, background: CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 14, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.65 : 1, transition: "all 0.2s" }}>
+                {loading ? <Spinner /> : <><Check size={14} /> Set Password</>}
               </button>
-              <button type="button" onClick={onClose} style={{ padding: "11px 18px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button type="button" onClick={onClose} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
             </div>
           </form>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, color: CLR.green, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 15 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, color: CLR.green, fontWeight: 700, fontSize: 15 }}>
               <Check size={16} /> Password updated successfully
             </div>
-            <div style={{ background: "rgba(0,0,0,0.4)", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "14px 16px" }}>
-              <div style={{ fontSize: 10, color: CLR.muted, letterSpacing: "0.1em", marginBottom: 6 }}>NEW PASSWORD</div>
+            <div style={{ background: "#f8fafc", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "14px 16px" }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>New Password</div>
               <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 18, color: CLR.accent, wordBreak: "break-all" }}>{newPass}</div>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={copy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px", borderRadius: 8, background: copied ? "rgba(34,197,94,0.15)" : CLR.accentDim, border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : "rgba(0,212,255,0.25)"}`, color: copied ? CLR.green : CLR.accent, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: "0.06em", cursor: "pointer" }}>
-                {copied ? <><Check size={14} /> COPIED</> : <><Copy size={14} /> COPY</>}
+              <button onClick={copy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px", borderRadius: 8, background: copied ? CLR.greenBg : CLR.accentDim, border: `1px solid ${copied ? CLR.greenBdr : "#bfdbfe"}`, color: copied ? CLR.green : CLR.accent, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy Password</>}
               </button>
-              <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Close</button>
+              <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Close</button>
             </div>
           </div>
         )}
@@ -423,9 +446,9 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
 
 // ─── Clients Tab ──────────────────────────────────────────────────────────────
 function ClientsTab() {
-  const [users,   setUsers]   = useState<User[]>([]);
-  const [demo,    setDemo]    = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [users,       setUsers]       = useState<User[]>([]);
+  const [demo,        setDemo]        = useState(false);
+  const [loading,     setLoading]     = useState(true);
   const [setPassUser, setSetPassUser] = useState<User | null>(null);
 
   useEffect(() => {
@@ -451,39 +474,42 @@ function ClientsTab() {
           }}
         />
       )}
-      <SectionHeader title="CLIENT MANAGEMENT" sub={`${users.length} registered users`} />
+      <SectionHeader title="Client Management" sub={`${users.length} registered users`} />
       {demo && <DemoBanner />}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         {users.length === 0 && (
-          <div style={{ ...glass(), padding: 32, textAlign: "center", color: CLR.muted, fontSize: 13 }}>
+          <div style={{ ...card(), padding: 32, textAlign: "center", color: CLR.muted, fontSize: 13 }}>
             No users registered yet.
           </div>
         )}
         {users.map((u) => (
-          <div
-            key={u.id}
-            style={{ ...glass(), padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", background: u.reset_requested ? "rgba(245,158,11,0.06)" : "rgba(255,255,255,0.03)", borderColor: u.reset_requested ? "rgba(245,158,11,0.2)" : CLR.border }}
-          >
-            <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(0,212,255,0.1)", border: `1px solid rgba(0,212,255,0.2)`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, color: CLR.accent, fontSize: 15, flexShrink: 0 }}>
+          <div key={u.id} style={{
+            ...card({ padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" as const }),
+            background: u.reset_requested ? CLR.amberBg : "#ffffff",
+            borderColor: u.reset_requested ? CLR.amberBdr : CLR.border,
+          }}>
+            <div style={{ width: 42, height: 42, borderRadius: "50%", background: CLR.accentDim, border: `1px solid #bfdbfe`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 700, color: CLR.accent, fontSize: 16, flexShrink: 0 }}>
               {(u.name ?? u.email ?? "?").charAt(0).toUpperCase()}
             </div>
 
             <div style={{ flex: 1, minWidth: 160 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontWeight: 600, color: CLR.text, fontSize: 14 }}>{u.name ?? u.email}</span>
-                <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 10, color: u.role === "CLIENT" ? CLR.muted : CLR.accent, background: u.role === "CLIENT" ? "rgba(255,255,255,0.05)" : CLR.accentDim, padding: "1px 7px", borderRadius: 4 }}>{u.role}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: u.role === "CLIENT" ? CLR.muted : CLR.accent, background: u.role === "CLIENT" ? "#f1f5f9" : CLR.accentDim, padding: "1px 7px", borderRadius: 4, border: `1px solid ${u.role === "CLIENT" ? CLR.border : "#bfdbfe"}` }}>{u.role}</span>
                 {u.reset_requested && (
-                  <span style={{ fontSize: 10, color: CLR.amber, background: "rgba(245,158,11,0.12)", padding: "1px 7px", borderRadius: 4, letterSpacing: "0.06em" }}>RESET REQUESTED</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.amber, background: CLR.amberBg, padding: "1px 7px", borderRadius: 4, border: `1px solid ${CLR.amberBdr}`, letterSpacing: "0.04em" }}>Reset Requested</span>
                 )}
               </div>
-              <div style={{ fontSize: 12, color: CLR.muted, marginTop: 2 }}>{u.email}{u.company ? ` · ${u.company}` : ""}</div>
-              <div style={{ fontSize: 11, color: CLR.muted, marginTop: 2 }}>{u.last_login ? `Last login: ${u.last_login} · ` : ""}{u.project_count ?? 0} project{(u.project_count ?? 0) !== 1 ? "s" : ""}</div>
+              <div style={{ fontSize: 12, color: CLR.muted, marginTop: 3 }}>{u.email}{u.company ? ` · ${u.company}` : ""}</div>
+              <div style={{ fontSize: 11, color: CLR.muted2, marginTop: 2 }}>{u.last_login ? `Last login: ${u.last_login} · ` : ""}{u.project_count ?? 0} project{(u.project_count ?? 0) !== 1 ? "s" : ""}</div>
             </div>
 
             <button
               onClick={() => setSetPassUser(u)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: u.reset_requested ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${u.reset_requested ? "rgba(245,158,11,0.3)" : CLR.border}`, color: u.reset_requested ? CLR.amber : CLR.muted, fontSize: 12, cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontWeight: 600, letterSpacing: "0.05em" }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: u.reset_requested ? CLR.amberBg : "#f8fafc", border: `1px solid ${u.reset_requested ? CLR.amberBdr : CLR.border}`, color: u.reset_requested ? CLR.amber : CLR.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.color = CLR.accent; e.currentTarget.style.background = CLR.accentDim; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = u.reset_requested ? CLR.amberBdr : CLR.border; e.currentTarget.style.color = u.reset_requested ? CLR.amber : CLR.muted; e.currentTarget.style.background = u.reset_requested ? CLR.amberBg : "#f8fafc"; }}
             >
               <RefreshCw size={12} /> Set Password
             </button>
@@ -510,18 +536,16 @@ function CreateUserTab() {
     e.preventDefault();
     if (password !== confirm) { setError("Passwords do not match"); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
-    setError(null);
-    setSuccess(null);
-    setLoading(true);
+    setError(null); setSuccess(null); setLoading(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_BASE}/api/admin/users/create`, {
+      const res = await fetch(`${API_BASE}/api/admin/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name, email, company, password, role }),
+        body: JSON.stringify({ full_name: name, email, company, password, role }),
       });
       const data = await res.json().catch(() => ({})) as Record<string, unknown>;
-      if (!res.ok) throw new Error((data.error as string) ?? "Failed to create user");
+      if (!res.ok) throw new Error((data.error as string) ?? (data.message as string) ?? "Failed to create user");
       setSuccess(email);
       setName(""); setEmail(""); setCompany(""); setPassword(""); setConfirm("");
     } catch (err) {
@@ -533,72 +557,68 @@ function CreateUserTab() {
 
   const inputStyle: CSSProperties = {
     width: "100%", padding: "10px 12px", borderRadius: 8,
-    border: `1px solid ${CLR.border}`, background: "rgba(255,255,255,0.05)",
+    border: `1px solid ${CLR.border}`, background: "#f8fafc",
     color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
-    fontFamily: "'Inter',sans-serif",
+    fontFamily: "'Inter',sans-serif", transition: "border-color 0.2s, box-shadow 0.2s",
   };
 
   const toggleBtnStyle = (active: boolean): CSSProperties => ({
-    padding: "7px 20px", borderRadius: 7, fontSize: 13, fontFamily: "'Rajdhani',sans-serif",
-    fontWeight: 700, letterSpacing: "0.06em", cursor: "pointer", transition: "all 0.15s",
-    background: active ? CLR.accentDim : "rgba(255,255,255,0.04)",
-    border: `1px solid ${active ? "rgba(0,212,255,0.3)" : CLR.border}`,
+    padding: "7px 20px", borderRadius: 7, fontSize: 13,
+    fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+    background: active ? CLR.accentDim : "#f8fafc",
+    border: `1px solid ${active ? "#bfdbfe" : CLR.border}`,
     color: active ? CLR.accent : CLR.muted,
   });
 
   return (
     <div className="admin-fade">
-      <SectionHeader title="CREATE USER" sub="Register a new client or sub-admin account" />
+      <SectionHeader title="Create User" sub="Register a new client or sub-admin account" />
 
       <div style={{ maxWidth: 480 }}>
         {success && (
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 10, marginBottom: 20, color: CLR.green, fontSize: 13 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: CLR.greenBg, border: `1px solid ${CLR.greenBdr}`, borderRadius: 10, marginBottom: 20, color: CLR.green, fontSize: 13 }}>
             <Check size={15} />
             <span>Account created for <strong>{success}</strong> — they can now log in.</span>
           </div>
         )}
 
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Full Name</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="John Smith" style={inputStyle} />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Email Address</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="john@company.com" style={inputStyle} />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Company</label>
-            <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="TechCo Systems" style={inputStyle} />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Password</label>
-            <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Set initial password" style={inputStyle} />
-          </div>
-          <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Confirm Password</label>
-            <input type="text" value={confirm} onChange={(e) => setConfirm(e.target.value)} required placeholder="Repeat password" style={inputStyle} />
-          </div>
+          {[
+            { label: "Full Name",     val: name,     set: setName,     ph: "John Smith",          type: "text"     },
+            { label: "Email Address", val: email,    set: setEmail,    ph: "john@company.com",     type: "email"    },
+            { label: "Company",       val: company,  set: setCompany,  ph: "TechCo Systems",       type: "text"     },
+            { label: "Password",      val: password, set: setPassword, ph: "Set initial password", type: "text"     },
+            { label: "Confirm",       val: confirm,  set: setConfirm,  ph: "Repeat password",      type: "text"     },
+          ].map(({ label, val, set, ph, type }) => (
+            <div key={label}>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>{label}</label>
+              <input type={type} value={val} onChange={(e) => set(e.target.value)} required={label !== "Company"} placeholder={ph} style={inputStyle}
+                onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+                onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }}
+              />
+            </div>
+          ))}
 
           <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Role</label>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Role</label>
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={() => setRole("CLIENT")} style={toggleBtnStyle(role === "CLIENT")}>CLIENT</button>
+              <button type="button" onClick={() => setRole("CLIENT")} style={toggleBtnStyle(role === "CLIENT")}>Client</button>
               {getRole() === "MASTER" && (
-                <button type="button" onClick={() => setRole("SUB_MASTER")} style={toggleBtnStyle(role === "SUB_MASTER")}>SUB MASTER</button>
+                <button type="button" onClick={() => setRole("SUB_MASTER")} style={toggleBtnStyle(role === "SUB_MASTER")}>Sub Master</button>
               )}
             </div>
           </div>
 
           {error && (
-            <div style={{ padding: "10px 14px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{error}</div>
+            <div style={{ padding: "10px 14px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{error}</div>
           )}
 
-          <button
-            type="submit" disabled={loading}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", borderRadius: 8, background: loading ? "rgba(0,212,255,0.2)" : "linear-gradient(135deg, #00d4ff, #0099bb)", border: "none", color: "#000", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: "0.08em", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, marginTop: 4 }}
+          <button type="submit" disabled={loading}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", borderRadius: 8, background: loading ? "rgba(37,99,235,0.55)" : CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 15, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, marginTop: 4, boxShadow: "0 4px 16px rgba(37,99,235,0.25)", transition: "all 0.2s" }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = "#1d4ed8"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = loading ? "rgba(37,99,235,0.55)" : CLR.accent; }}
           >
-            {loading ? <Spinner /> : <><UserPlus size={15} /> CREATE USER</>}
+            {loading ? <Spinner /> : <><UserPlus size={15} /> Create User</>}
           </button>
         </form>
       </div>
@@ -636,9 +656,7 @@ function LicenseTab() {
 
   async function generate(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
-    setResult(null);
-    setLoading(true);
+    setError(null); setResult(null); setLoading(true);
     try {
       const token = getToken();
       const body: Record<string, unknown> = { username, project_name: projectName, mode, protocols, ttl_days: ttl, allowed_meters: meters };
@@ -652,10 +670,9 @@ function LicenseTab() {
       if (!res.ok) throw new Error(data.message ?? "Failed to generate license");
       setResult(data);
     } catch {
-      // demo fallback
       const exp = new Date();
       exp.setDate(exp.getDate() + ttl);
-      const modeTag = isOffline ? "AIR" : "SAS";
+      const modeTag  = isOffline ? "AIR" : "SAS";
       const protoTag = protocols === "RTU Only" ? "RTU" : protocols === "TCP Only" ? "TCP" : "ALL";
       setResult({
         license_key: `TDQ-${modeTag}-${protoTag}-${Math.random().toString(36).slice(2,8).toUpperCase()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`,
@@ -669,94 +686,86 @@ function LicenseTab() {
 
   function copy() {
     if (!result) return;
-    navigator.clipboard.writeText(result.license_key).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(result.license_key).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }
 
   const inputStyle: CSSProperties = {
     width: "100%", padding: "10px 12px", borderRadius: 8,
-    border: `1px solid ${CLR.border}`, background: "rgba(255,255,255,0.05)",
+    border: `1px solid ${CLR.border}`, background: "#f8fafc",
     color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
-    fontFamily: "'Inter',sans-serif",
+    fontFamily: "'Inter',sans-serif", transition: "border-color 0.2s, box-shadow 0.2s",
   };
 
-  const toggleBtnStyle = (active: boolean, color?: string): CSSProperties => ({
-    padding: "7px 18px", borderRadius: 7, fontSize: 13, fontFamily: "'Rajdhani',sans-serif",
-    fontWeight: 700, letterSpacing: "0.06em", cursor: "pointer", transition: "all 0.15s",
-    background: active ? (color ?? CLR.accentDim) : "rgba(255,255,255,0.04)",
-    border: `1px solid ${active ? (color ? color + "55" : "rgba(0,212,255,0.3)") : CLR.border}`,
-    color: active ? (color ? "#fff" : CLR.accent) : CLR.muted,
+  const toggleBtn = (active: boolean, color?: string): CSSProperties => ({
+    padding: "7px 18px", borderRadius: 7, fontSize: 13,
+    fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+    background: active ? (color ? `${color}14` : CLR.accentDim) : "#f8fafc",
+    border: `1px solid ${active ? (color ? `${color}40` : "#bfdbfe") : CLR.border}`,
+    color: active ? (color ?? CLR.accent) : CLR.muted,
   });
 
   return (
     <div className="admin-fade">
-      <SectionHeader title="LICENSE GENERATOR" sub="Generate TechniDAQ client licenses" />
+      <SectionHeader title="License Generator" sub="Generate TechniDAQ client licenses" />
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, maxWidth: 820 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 24, maxWidth: 820 }}>
         {/* Form */}
         <form onSubmit={generate} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Username</label>
-            <input value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="client_username" style={inputStyle} />
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Username</label>
+            <input value={username} onChange={(e) => setUsername(e.target.value)} required placeholder="client_username" style={inputStyle}
+              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+              onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
           </div>
           <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Project Name</label>
-            <input value={projectName} onChange={(e) => setProjectName(e.target.value)} required placeholder="HVAC Complex A" style={inputStyle} />
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Project Name</label>
+            <input value={projectName} onChange={(e) => setProjectName(e.target.value)} required placeholder="HVAC Complex A" style={inputStyle}
+              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+              onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
           </div>
 
-          {/* Mode */}
           <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Mode</label>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Mode</label>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {(["Offline Air-Gapped", "Online SaaS"] as const).map((m) => (
-                <button key={m} type="button" onClick={() => handleModeChange(m)} style={toggleBtnStyle(mode === m)}>{m}</button>
+                <button key={m} type="button" onClick={() => handleModeChange(m)} style={toggleBtn(mode === m)}>{m}</button>
               ))}
             </div>
           </div>
 
-          {/* Tier — only shown for Online SaaS */}
           {!isOffline && (
             <div>
-              <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Tier</label>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Tier</label>
               <div style={{ display: "flex", gap: 8 }}>
                 {[1, 2].map((t) => (
-                  <button key={t} type="button" onClick={() => setTier(t)}
-                    style={toggleBtnStyle(tier === t, TIER_COLOR[t])}>
-                    TIER {t}
-                  </button>
+                  <button key={t} type="button" onClick={() => setTier(t)} style={toggleBtn(tier === t, TIER_COLOR[t])}>Tier {t}</button>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Protocols */}
           <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Protocols</label>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Protocols</label>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {(["RTU Only", "TCP Only", "All Protocols"] as const).map((p) => (
-                <button key={p} type="button" onClick={() => setProtocols(p)} style={toggleBtnStyle(protocols === p)}>{p}</button>
+                <button key={p} type="button" onClick={() => setProtocols(p)} style={toggleBtn(protocols === p)}>{p}</button>
               ))}
             </div>
           </div>
 
-          {/* TTL */}
           <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Validity (days)</label>
-            <input type="number" min={1} max={3650} value={ttl} onChange={(e) => setTtl(Number(e.target.value))} style={{ ...inputStyle, width: 120 }} />
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Validity (days)</label>
+            <input type="number" min={1} max={3650} value={ttl} onChange={(e) => setTtl(Number(e.target.value))} style={{ ...inputStyle, width: 120 }}
+              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+              onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
           </div>
 
-          {/* Meters */}
           <div>
-            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {METER_OPTIONS.map((opt) => (
                 <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                  <div
-                    onClick={() => toggleMeter(opt.id)}
-                    style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "transparent", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}
-                  >
+                  <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                     {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
                   </div>
                   <span style={{ fontSize: 13, color: meters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
@@ -766,25 +775,25 @@ function LicenseTab() {
           </div>
 
           {error && (
-            <div style={{ padding: "10px 14px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{error}</div>
+            <div style={{ padding: "10px 14px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{error}</div>
           )}
 
-          <button
-            type="submit" disabled={loading}
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", borderRadius: 8, background: loading ? "rgba(0,212,255,0.2)" : "linear-gradient(135deg, #00d4ff, #0099bb)", border: "none", color: "#000", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: "0.08em", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1 }}
+          <button type="submit" disabled={loading}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", borderRadius: 8, background: loading ? "rgba(37,99,235,0.55)" : CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 15, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, boxShadow: "0 4px 16px rgba(37,99,235,0.25)", transition: "all 0.2s" }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = "#1d4ed8"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = loading ? "rgba(37,99,235,0.55)" : CLR.accent; }}
           >
-            {loading ? <Spinner /> : <><Key size={14} /> GENERATE LICENSE</>}
+            {loading ? <Spinner /> : <><Key size={14} /> Generate License</>}
           </button>
         </form>
 
         {/* Result */}
         <div>
           {result ? (
-            <div style={{ ...glass(), padding: 24, display: "flex", flexDirection: "column", gap: 16 }}>
-              <div style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 15, color: CLR.green, letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: 8 }}>
-                <Check size={16} /> LICENSE GENERATED
+            <div style={{ ...card({ padding: 24, display: "flex", flexDirection: "column", gap: 16 }) }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: CLR.green, fontWeight: 700, fontSize: 15 }}>
+                <Check size={16} /> License Generated
               </div>
-
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {([
                   ["User",      result.username],
@@ -794,35 +803,28 @@ function LicenseTab() {
                   ["Protocols", result.protocols],
                   ["Expires",   result.expires_at],
                 ] as ([string, string] | null)[]).filter((x): x is [string, string] => x !== null).map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 12 }}>
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderBottom: `1px solid #f1f5f9` }}>
                     <span style={{ color: CLR.muted }}>{k}</span>
-                    <span style={{ color: CLR.text, fontWeight: 500 }}>{v}</span>
+                    <span style={{ color: CLR.text, fontWeight: 600 }}>{v}</span>
                   </div>
                 ))}
               </div>
-
-              <div style={{ background: "rgba(0,0,0,0.4)", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "14px 16px" }}>
-                <div style={{ fontSize: 10, color: CLR.muted, letterSpacing: "0.1em", marginBottom: 8 }}>LICENSE KEY</div>
-                <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 14, color: CLR.accent, wordBreak: "break-all", lineHeight: 1.6 }}>{result.license_key}</div>
+              <div style={{ background: "#f8fafc", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "14px 16px" }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>License Key</div>
+                <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 13, color: CLR.accent, wordBreak: "break-all", lineHeight: 1.6 }}>{result.license_key}</div>
               </div>
-
-              <button
-                onClick={copy}
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px", borderRadius: 8, background: copied ? "rgba(34,197,94,0.12)" : CLR.accentDim, border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : "rgba(0,212,255,0.25)"}`, color: copied ? CLR.green : CLR.accent, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: "0.06em", cursor: "pointer" }}
-              >
-                {copied ? <><Check size={14} /> COPIED!</> : <><Copy size={14} /> COPY KEY</>}
+              <button onClick={copy}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px", borderRadius: 8, background: copied ? CLR.greenBg : CLR.accentDim, border: `1px solid ${copied ? CLR.greenBdr : "#bfdbfe"}`, color: copied ? CLR.green : CLR.accent, fontWeight: 700, fontSize: 13, cursor: "pointer", transition: "all 0.2s" }}>
+                {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy Key</>}
               </button>
-
-              <button
-                onClick={() => setResult(null)}
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: 8, background: "transparent", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 12, cursor: "pointer" }}
-              >
+              <button onClick={() => setResult(null)}
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>
                 Generate Another
               </button>
             </div>
           ) : (
-            <div style={{ ...glass(), padding: 32, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 200, textAlign: "center", gap: 10 }}>
-              <Key size={28} color={CLR.muted} />
+            <div style={{ ...card({ padding: 32, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 200, textAlign: "center", gap: 10 }) }}>
+              <Key size={28} color={CLR.muted2} />
               <div style={{ color: CLR.muted, fontSize: 13 }}>Fill in the form and generate a license key</div>
             </div>
           )}
@@ -836,10 +838,10 @@ function LicenseTab() {
 type Tab = "fleet" | "clients" | "create" | "licenses";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: "fleet",    label: "Global Fleet",       icon: <Globe size={16} /> },
-  { id: "clients",  label: "Client Management",  icon: <Users size={16} /> },
-  { id: "create",   label: "Create User",        icon: <UserPlus size={16} /> },
-  { id: "licenses", label: "License Generator",  icon: <Key size={16} /> },
+  { id: "fleet",    label: "Global Fleet",      icon: <Globe size={15} />    },
+  { id: "clients",  label: "Client Management", icon: <Users size={15} />    },
+  { id: "create",   label: "Create User",       icon: <UserPlus size={15} /> },
+  { id: "licenses", label: "License Generator", icon: <Key size={15} />      },
 ];
 
 export default function AdminDashboard() {
@@ -855,19 +857,26 @@ export default function AdminDashboard() {
   return (
     <>
       <style>{DOT_GRID}</style>
-      <div className="admin-bg" style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter',sans-serif" }}>
+      <div className="admin-bg" style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter',system-ui,sans-serif" }}>
 
         {/* Sidebar */}
-        <aside style={{ width: 220, flexShrink: 0, background: CLR.sidebar, borderRight: `1px solid ${CLR.border}`, display: "flex", flexDirection: "column", padding: "24px 0" }}>
+        <aside style={{ width: 232, flexShrink: 0, background: CLR.sidebar, borderRight: `1px solid ${CLR.border}`, display: "flex", flexDirection: "column", boxShadow: "2px 0 8px rgba(0,0,0,0.04)" }}>
           {/* Logo */}
-          <div style={{ padding: "0 20px 24px", borderBottom: `1px solid ${CLR.border}`, marginBottom: 8 }}>
-            <div style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 18, color: CLR.accent, letterSpacing: "0.1em" }}>TECHNICAT</div>
-            <div style={{ fontSize: 10, color: CLR.muted, letterSpacing: "0.15em", marginTop: 2 }}>GOD MODE</div>
+          <div style={{ padding: "20px 18px 16px", borderBottom: `1px solid #f1f5f9` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}>
+                <Zap size={16} color="#fff" strokeWidth={2.5} />
+              </div>
+              <div>
+                <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: "0.95rem", color: CLR.text, lineHeight: 1 }}>TechniDAQ</div>
+                <div style={{ fontSize: 10, color: CLR.muted2, letterSpacing: "0.06em", lineHeight: 1.5 }}>Admin Portal</div>
+              </div>
+            </div>
           </div>
 
           {/* Role badge */}
-          <div style={{ padding: "8px 20px 16px", marginBottom: 4 }}>
-            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 10, color: CLR.amber, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", padding: "3px 10px", borderRadius: 4 }}>
+          <div style={{ padding: "10px 18px 12px" }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: CLR.amber, background: CLR.amberBg, border: `1px solid ${CLR.amberBdr}`, padding: "3px 10px", borderRadius: 5, letterSpacing: "0.06em" }}>
               {role ?? "ADMIN"}
             </span>
           </div>
@@ -877,10 +886,17 @@ export default function AdminDashboard() {
             {NAV_ITEMS.map((item) => {
               const active = tab === item.id;
               return (
-                <button
-                  key={item.id}
-                  onClick={() => setTab(item.id)}
-                  style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, border: "none", cursor: "pointer", textAlign: "left", fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: active ? 600 : 400, background: active ? CLR.accentDim : "transparent", color: active ? CLR.accent : CLR.muted, transition: "all 0.15s" }}
+                <button key={item.id} onClick={() => setTab(item.id)} style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "9px 12px",
+                  borderRadius: 8, border: active ? `1px solid #bfdbfe` : "1px solid transparent",
+                  cursor: "pointer", textAlign: "left", fontFamily: "'Inter',sans-serif",
+                  fontSize: 14, fontWeight: active ? 600 : 400,
+                  background: active ? CLR.accentDim : "transparent",
+                  color: active ? CLR.accent : CLR.muted,
+                  transition: "all 0.15s",
+                }}
+                  onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = "#f8fafc"; e.currentTarget.style.color = "#334155"; } }}
+                  onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = CLR.muted; } }}
                 >
                   {item.icon} {item.label}
                 </button>
@@ -888,21 +904,41 @@ export default function AdminDashboard() {
             })}
           </nav>
 
-          {/* Logout */}
-          <div style={{ padding: "12px 10px 0", borderTop: `1px solid ${CLR.border}`, marginTop: 8 }}>
-            <button
-              onClick={logout}
-              style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, border: "none", cursor: "pointer", background: "transparent", color: CLR.muted, fontSize: 13, width: "100%", transition: "color 0.15s" }}
-              onMouseEnter={(e) => { e.currentTarget.style.color = CLR.danger; }}
-              onMouseLeave={(e) => { e.currentTarget.style.color = CLR.muted; }}
+          {/* Bottom buttons */}
+          <div style={{ padding: "12px 10px", borderTop: `1px solid #f1f5f9`, display: "flex", flexDirection: "column", gap: 6 }}>
+            {/* Main Website */}
+            <button onClick={() => navigate("/")} style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%",
+              padding: "9px 12px", borderRadius: 8,
+              background: "#f8fafc", border: `1px solid ${CLR.border}`,
+              color: CLR.muted, cursor: "pointer",
+              fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: "0.85rem",
+              transition: "all 0.15s",
+            }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = CLR.accentDim; e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.color = CLR.accent; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "#f8fafc"; e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; }}
             >
-              <LogOut size={15} /> Log Out
+              <Globe size={14} /> Main Website
+            </button>
+            {/* Sign out */}
+            <button onClick={logout} style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%",
+              padding: "9px 12px", borderRadius: 8,
+              background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`,
+              color: CLR.danger, cursor: "pointer",
+              fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: "0.85rem",
+              transition: "all 0.15s",
+            }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "#fee2e2"; e.currentTarget.style.borderColor = "#fca5a5"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = CLR.dangerBg; e.currentTarget.style.borderColor = CLR.dangerBdr; }}
+            >
+              <LogOut size={14} /> Sign Out
             </button>
           </div>
         </aside>
 
         {/* Main Content */}
-        <main style={{ flex: 1, overflow: "auto", padding: 32 }}>
+        <main style={{ flex: 1, overflow: "auto", padding: "32px 36px" }}>
           {tab === "fleet"    && <FleetTab />}
           {tab === "clients"  && <ClientsTab />}
           {tab === "create"   && <CreateUserTab />}
