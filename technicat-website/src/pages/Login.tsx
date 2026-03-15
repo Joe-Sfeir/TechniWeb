@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Zap, Mail, Lock, ArrowRight, AlertCircle, ShieldCheck, ArrowLeft } from "lucide-react";
-import { setAuth } from "../lib/auth";
+import { setAuth, getToken, getRole } from "../lib/auth";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "https://technicloudapi.onrender.com";
 type Step = "credentials" | "2fa";
@@ -10,14 +10,28 @@ type Step = "credentials" | "2fa";
 export default function Login() {
   const navigate = useNavigate();
   const [step,     setStep]     = useState<Step>("credentials");
-  const [email,    setEmail]    = useState("");
+  const [email,    setEmail]    = useState(() => localStorage.getItem("last_email") ?? "");
   const [password, setPassword] = useState("");
   const [otp,      setOtp]      = useState("");
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState<string | null>(null);
 
+  // If already logged in, skip straight to the right page
+  useEffect(() => {
+    const token = getToken();
+    const role  = getRole();
+    if (token && role) {
+      navigate(role === "CLIENT" ? "/dashboard" : "/admin", { replace: true });
+    }
+  }, [navigate]);
+
+  // Guard against double-submission
+  const submittingRef = useRef(false);
+
   async function handleCredentials(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError(null);
     setLoading(true);
     try {
@@ -29,9 +43,11 @@ export default function Login() {
       const data = await res.json().catch(() => ({})) as Record<string, unknown>;
       if (!res.ok) throw new Error((data.error as string) ?? "Invalid credentials");
       if (data.requires_2fa) {
+        localStorage.setItem("last_email", email);
         setStep("2fa");
       } else if (data.token && data.user) {
         const user = data.user as { id: number; email: string; role: string };
+        localStorage.setItem("last_email", email);
         setAuth(data.token as string, user.role);
         navigate(user.role === "CLIENT" ? "/dashboard" : "/admin", { replace: true });
       } else {
@@ -41,11 +57,14 @@ export default function Login() {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   }
 
   async function handle2FA(e: React.FormEvent) {
     e.preventDefault();
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError(null);
     setLoading(true);
     try {
@@ -54,19 +73,27 @@ export default function Login() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: otp }),
       });
-      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      const text = await res.text();
+      console.log("[2FA] Response status:", res.status, "body:", text);
+
+      let data: Record<string, unknown> = {};
+      try { data = JSON.parse(text); } catch { /* empty */ }
+
       if (!res.ok) throw new Error((data.error as string) ?? "Invalid code");
       if (data.token && data.user) {
         const user = data.user as { id: number; email: string; role: string };
+        localStorage.setItem("last_email", email);
         setAuth(data.token as string, user.role);
         navigate(user.role === "CLIENT" ? "/dashboard" : "/admin", { replace: true });
       } else {
         throw new Error("Unexpected server response");
       }
     } catch (err) {
+      console.error("[2FA] Error:", err);
       setError(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   }
 

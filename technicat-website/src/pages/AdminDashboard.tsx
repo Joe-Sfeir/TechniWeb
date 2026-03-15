@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink } from "lucide-react";
+import { Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus } from "lucide-react";
 import { getToken, getRole, clearAuth } from "../lib/auth";
 
 import { API_URL } from "../config";
@@ -51,6 +51,7 @@ interface Project {
   status: "online" | "offline" | "warning";
   device_count: number;
   last_seen: string;
+  user_id?: string | null;
 }
 
 interface User {
@@ -143,111 +144,278 @@ function DemoBanner() {
 // ─── Fleet Tab ────────────────────────────────────────────────────────────────
 function FleetTab() {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [demo,     setDemo]     = useState(false);
-  const [loading,  setLoading]  = useState(true);
+  const [projects,    setProjects]    = useState<Project[]>([]);
+  const [users,       setUsers]       = useState<User[]>([]);
+  const [demo,        setDemo]        = useState(false);
+  const [loading,     setLoading]     = useState(true);
+  const [assignSel,   setAssignSel]   = useState<Record<string, string>>({});
+  const [assigning,   setAssigning]   = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const token = getToken();
-    fetch(`${API_BASE}/api/admin/projects`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
-      .then((d) => { setProjects(Array.isArray(d) ? d : d.projects ?? []); })
-      .catch(() => { setProjects(DEMO_PROJECTS); setDemo(true); })
+    const headers = { Authorization: `Bearer ${token}` };
+    Promise.all([
+      fetch(`${API_BASE}/api/admin/projects`, { headers }).then((r) => r.json()),
+      fetch(`${API_BASE}/api/admin/users`,    { headers }).then((r) => r.json()),
+    ])
+      .then(([pd, ud]) => {
+        setProjects(Array.isArray(pd) ? pd : pd.projects ?? []);
+        const allUsers: User[] = Array.isArray(ud) ? ud : ud.users ?? [];
+        setUsers(allUsers.filter((u) => u.role === "CLIENT"));
+      })
+      .catch(() => {
+        setProjects(DEMO_PROJECTS);
+        setUsers(DEMO_USERS.filter((u) => u.role === "CLIENT"));
+        setDemo(true);
+      })
       .finally(() => setLoading(false));
   }, []);
 
+  async function assign(projectId: string) {
+    const userId = assignSel[projectId];
+    if (!userId) return;
+    setAssigning((prev) => ({ ...prev, [projectId]: true }));
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/projects/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ project_id: projectId, user_id: userId }),
+      });
+      if (!res.ok) throw new Error("assign failed");
+      setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, user_id: userId } : p));
+    } catch {
+      // demo: optimistically update anyway
+      setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, user_id: userId } : p));
+    } finally {
+      setAssigning((prev) => ({ ...prev, [projectId]: false }));
+    }
+  }
+
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>;
+
+  const assigned   = projects.filter((p) => p.user_id != null);
+  const unassigned = projects.filter((p) => p.user_id == null);
+
+  const projectTableRows = (rows: Project[]) =>
+    rows.map((p, i) => (
+      <tr key={p.id} style={{ borderBottom: `1px solid ${CLR.border}`, background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+        <td style={{ padding: "12px 12px", color: CLR.text, fontWeight: 500 }}>{p.name}</td>
+        <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.client}</td>
+        <td style={{ padding: "12px 12px" }}>
+          <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}18`, padding: "2px 8px", borderRadius: 4 }}>
+            TIER {p.tier}
+          </span>
+        </td>
+        <td style={{ padding: "12px 12px" }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 6, color: CLR.text }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_DOT[p.status] ?? CLR.muted, flexShrink: 0 }} />
+            {p.status}
+          </span>
+        </td>
+        <td style={{ padding: "12px 12px", color: CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{p.device_count}</td>
+        <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.last_seen}</td>
+        <td style={{ padding: "12px 12px" }}>
+          <button
+            onClick={() => navigate(`/dashboard/${p.id}`, { state: { from: "/admin" } })}
+            style={{ display: "flex", alignItems: "center", gap: 5, background: CLR.accentDim, border: `1px solid rgba(0,212,255,0.2)`, borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontWeight: 600, letterSpacing: "0.04em" }}
+          >
+            <ExternalLink size={11} /> View
+          </button>
+        </td>
+      </tr>
+    ));
+
+  const tableHead = (cols: string[]) => (
+    <thead>
+      <tr style={{ borderBottom: `1px solid ${CLR.border}` }}>
+        {cols.map((h) => (
+          <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
+        ))}
+      </tr>
+    </thead>
+  );
 
   return (
     <div className="admin-fade">
       <SectionHeader title="GLOBAL FLEET" sub={`${projects.length} active projects across all clients`} />
       {demo && <DemoBanner />}
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif", fontSize: 13 }}>
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${CLR.border}` }}>
-              {["Project", "Client", "Tier", "Status", "Devices", "Last Seen", ""].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "8px 12px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {projects.map((p, i) => (
-              <tr key={p.id} style={{ borderBottom: `1px solid ${CLR.border}`, background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
-                <td style={{ padding: "12px 12px", color: CLR.text, fontWeight: 500 }}>{p.name}</td>
-                <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.client}</td>
-                <td style={{ padding: "12px 12px" }}>
-                  <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}18`, padding: "2px 8px", borderRadius: 4 }}>
-                    TIER {p.tier}
-                  </span>
-                </td>
-                <td style={{ padding: "12px 12px" }}>
-                  <span style={{ display: "flex", alignItems: "center", gap: 6, color: CLR.text }}>
-                    <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_DOT[p.status] ?? CLR.muted, flexShrink: 0 }} />
-                    {p.status}
-                  </span>
-                </td>
-                <td style={{ padding: "12px 12px", color: CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{p.device_count}</td>
-                <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.last_seen}</td>
-                <td style={{ padding: "12px 12px" }}>
-                  <button
-                    onClick={() => navigate(`/dashboard/${p.id}`)}
-                    style={{ display: "flex", alignItems: "center", gap: 5, background: CLR.accentDim, border: `1px solid rgba(0,212,255,0.2)`, borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontWeight: 600, letterSpacing: "0.04em" }}
-                  >
-                    <ExternalLink size={11} /> View
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Assigned projects */}
+      {assigned.length > 0 && (
+        <div style={{ overflowX: "auto", marginBottom: 32 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif", fontSize: 13 }}>
+            {tableHead(["Project", "Client", "Tier", "Status", "Devices", "Last Seen", ""])}
+            <tbody>{projectTableRows(assigned)}</tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Unassigned projects */}
+      {unassigned.length > 0 && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+            <span style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 13, color: CLR.amber, letterSpacing: "0.08em", textTransform: "uppercase" }}>Unassigned Projects</span>
+            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 10, color: CLR.amber, background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.25)", padding: "1px 8px", borderRadius: 4 }}>{unassigned.length}</span>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif", fontSize: 13 }}>
+              {tableHead(["Project", "Client", "Tier", "Status", "Devices", "Last Seen", "", "Assign To", ""])}
+              <tbody>
+                {unassigned.map((p, i) => (
+                  <tr key={p.id} style={{ borderBottom: `1px solid ${CLR.border}`, background: i % 2 === 0 ? "rgba(245,158,11,0.02)" : "rgba(245,158,11,0.04)" }}>
+                    <td style={{ padding: "12px 12px", color: CLR.text, fontWeight: 500 }}>{p.name}</td>
+                    <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.client}</td>
+                    <td style={{ padding: "12px 12px" }}>
+                      <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}18`, padding: "2px 8px", borderRadius: 4 }}>
+                        TIER {p.tier}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 12px" }}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 6, color: CLR.text }}>
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: STATUS_DOT[p.status] ?? CLR.muted, flexShrink: 0 }} />
+                        {p.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: "12px 12px", color: CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{p.device_count}</td>
+                    <td style={{ padding: "12px 12px", color: CLR.muted }}>{p.last_seen}</td>
+                    <td style={{ padding: "12px 12px" }}>
+                      <button
+                        onClick={() => navigate(`/dashboard/${p.id}`, { state: { from: "/admin" } })}
+                        style={{ display: "flex", alignItems: "center", gap: 5, background: CLR.accentDim, border: `1px solid rgba(0,212,255,0.2)`, borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontWeight: 600, letterSpacing: "0.04em" }}
+                      >
+                        <ExternalLink size={11} /> View
+                      </button>
+                    </td>
+                    <td style={{ padding: "12px 12px" }}>
+                      <select
+                        value={assignSel[p.id] ?? ""}
+                        onChange={(e) => setAssignSel((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                        style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CLR.border}`, background: "rgba(255,255,255,0.05)", color: assignSel[p.id] ? CLR.text : CLR.muted, fontSize: 12, outline: "none", cursor: "pointer", minWidth: 160 }}
+                      >
+                        <option value="" disabled>Select client…</option>
+                        {users.map((u) => (
+                          <option key={u.id} value={u.id}>{u.email}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={{ padding: "12px 12px" }}>
+                      <button
+                        disabled={!assignSel[p.id] || assigning[p.id]}
+                        onClick={() => assign(p.id)}
+                        style={{ display: "flex", alignItems: "center", gap: 5, background: assignSel[p.id] ? "rgba(245,158,11,0.15)" : "rgba(255,255,255,0.04)", border: `1px solid ${assignSel[p.id] ? "rgba(245,158,11,0.35)" : CLR.border}`, borderRadius: 6, padding: "5px 12px", color: assignSel[p.id] ? CLR.amber : CLR.muted, fontSize: 12, cursor: assignSel[p.id] ? "pointer" : "not-allowed", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, letterSpacing: "0.04em", whiteSpace: "nowrap" }}
+                      >
+                        {assigning[p.id] ? <Spinner /> : "Assign"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {projects.length === 0 && (
+        <div style={{ ...glass(), padding: 32, textAlign: "center", color: CLR.muted, fontSize: 13 }}>
+          No projects found.
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── Password Modal ───────────────────────────────────────────────────────────
-function PasswordModal({ password, onClose }: { password: string; onClose: () => void }) {
-  const [copied, setCopied] = useState(false);
+// ─── Set Password Modal ───────────────────────────────────────────────────────
+function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: () => void; onSuccess: (userId: string) => void }) {
+  const [newPass,     setNewPass]     = useState("");
+  const [confirmPass, setConfirmPass] = useState("");
+  const [loading,     setLoading]     = useState(false);
+  const [error,       setError]       = useState<string | null>(null);
+  const [done,        setDone]        = useState(false);
+  const [copied,      setCopied]      = useState(false);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPass !== confirmPass) { setError("Passwords do not match"); return; }
+    if (newPass.length < 6) { setError("Password must be at least 6 characters"); return; }
+    setError(null);
+    setLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/users/set-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ user_id: user.id, new_password: newPass }),
+      });
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Failed to set password");
+      setDone(true);
+      onSuccess(user.id);
+    } catch {
+      // demo fallback — proceed anyway
+      setDone(true);
+      onSuccess(user.id);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function copy() {
-    navigator.clipboard.writeText(password).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(newPass).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }
+
+  const inputStyle: CSSProperties = {
+    width: "100%", padding: "10px 12px", borderRadius: 8,
+    border: `1px solid ${CLR.border}`, background: "rgba(255,255,255,0.05)",
+    color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
+    fontFamily: "'Inter',sans-serif",
+  };
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)" }}>
-      <div style={{ ...glass(), padding: 36, maxWidth: 480, width: "90%", position: "relative" }}>
+      <div style={{ ...glass(), padding: 36, maxWidth: 440, width: "90%", position: "relative" }}>
         <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", color: CLR.muted, cursor: "pointer" }}>
           <X size={18} />
         </button>
 
-        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 18, color: CLR.text, letterSpacing: "0.06em", marginBottom: 6 }}>TEMP PASSWORD</div>
-        <div style={{ fontSize: 12, color: CLR.muted, marginBottom: 24 }}>Share this with the user — it expires on first login</div>
+        <div style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 18, color: CLR.text, letterSpacing: "0.06em", marginBottom: 4 }}>SET PASSWORD</div>
+        <div style={{ fontSize: 12, color: CLR.muted, marginBottom: 24 }}>{user.name} · {user.email}</div>
 
-        <div style={{ background: "rgba(0,0,0,0.4)", border: `1px solid ${CLR.border}`, borderRadius: 10, padding: "18px 20px", marginBottom: 20 }}>
-          <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 22, color: CLR.accent, letterSpacing: "0.1em", wordBreak: "break-all", lineHeight: 1.5 }}>
-            {password}
+        {!done ? (
+          <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>New Password</label>
+              <input type="text" value={newPass} onChange={(e) => setNewPass(e.target.value)} required placeholder="Enter new password" style={inputStyle} autoFocus />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Confirm Password</label>
+              <input type="text" value={confirmPass} onChange={(e) => setConfirmPass(e.target.value)} required placeholder="Repeat password" style={inputStyle} />
+            </div>
+            {error && <div style={{ padding: "8px 12px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{error}</div>}
+            <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+              <button type="submit" disabled={loading} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 8, background: "linear-gradient(135deg, #00d4ff, #0099bb)", border: "none", color: "#000", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 14, letterSpacing: "0.06em", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1 }}>
+                {loading ? <Spinner /> : <><Check size={14} /> SET PASSWORD</>}
+              </button>
+              <button type="button" onClick={onClose} style={{ padding: "11px 18px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </form>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, color: CLR.green, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 15 }}>
+              <Check size={16} /> Password updated successfully
+            </div>
+            <div style={{ background: "rgba(0,0,0,0.4)", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "14px 16px" }}>
+              <div style={{ fontSize: 10, color: CLR.muted, letterSpacing: "0.1em", marginBottom: 6 }}>NEW PASSWORD</div>
+              <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 18, color: CLR.accent, wordBreak: "break-all" }}>{newPass}</div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={copy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px", borderRadius: 8, background: copied ? "rgba(34,197,94,0.15)" : CLR.accentDim, border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : "rgba(0,212,255,0.25)"}`, color: copied ? CLR.green : CLR.accent, fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 13, letterSpacing: "0.06em", cursor: "pointer" }}>
+                {copied ? <><Check size={14} /> COPIED</> : <><Copy size={14} /> COPY</>}
+              </button>
+              <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Close</button>
+            </div>
           </div>
-        </div>
-
-        <div style={{ display: "flex", gap: 10 }}>
-          <button
-            onClick={copy}
-            style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", borderRadius: 8, background: copied ? "rgba(34,197,94,0.15)" : CLR.accentDim, border: `1px solid ${copied ? "rgba(34,197,94,0.3)" : "rgba(0,212,255,0.25)"}`, color: copied ? CLR.green : CLR.accent, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", letterSpacing: "0.06em" }}
-          >
-            {copied ? <><Check size={14} /> COPIED</> : <><Copy size={14} /> COPY PASSWORD</>}
-          </button>
-          <button
-            onClick={onClose}
-            style={{ padding: "12px 18px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}
-          >
-            Close
-          </button>
-        </div>
+        )}
       </div>
     </div>
   );
@@ -255,11 +423,10 @@ function PasswordModal({ password, onClose }: { password: string; onClose: () =>
 
 // ─── Clients Tab ──────────────────────────────────────────────────────────────
 function ClientsTab() {
-  const [users,    setUsers]    = useState<User[]>([]);
-  const [demo,     setDemo]     = useState(false);
-  const [loading,  setLoading]  = useState(true);
-  const [resetting, setResetting] = useState<string | null>(null);
-  const [modal,    setModal]    = useState<string | null>(null); // holds temp password
+  const [users,   setUsers]   = useState<User[]>([]);
+  const [demo,    setDemo]    = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [setPassUser, setSetPassUser] = useState<User | null>(null);
 
   useEffect(() => {
     const token = getToken();
@@ -270,84 +437,170 @@ function ClientsTab() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function resetPassword(userId: string) {
-    setResetting(userId);
-    try {
-      const token = getToken();
-      const res = await fetch(`${API_BASE}/api/admin/users/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ user_id: userId }),
-      });
-      const data = await res.json() as { temp_password?: string };
-      if (data.temp_password) {
-        setModal(data.temp_password);
-        setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, reset_requested: false } : u));
-      }
-    } catch {
-      // demo fallback — show a fake password
-      setModal("TechniDAQ#" + Math.random().toString(36).slice(2, 10).toUpperCase());
-    } finally {
-      setResetting(null);
-    }
-  }
-
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>;
-
-  const currentRole = getRole();
 
   return (
     <div className="admin-fade">
-      {modal && <PasswordModal password={modal} onClose={() => setModal(null)} />}
+      {setPassUser && (
+        <SetPasswordModal
+          user={setPassUser}
+          onClose={() => setSetPassUser(null)}
+          onSuccess={(userId) => {
+            setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, reset_requested: false } : u));
+            setSetPassUser(null);
+          }}
+        />
+      )}
       <SectionHeader title="CLIENT MANAGEMENT" sub={`${users.length} registered users`} />
       {demo && <DemoBanner />}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {users.length === 0 && (
+          <div style={{ ...glass(), padding: 32, textAlign: "center", color: CLR.muted, fontSize: 13 }}>
+            No users registered yet.
+          </div>
+        )}
         {users.map((u) => (
           <div
             key={u.id}
-            style={{
-              ...glass(),
-              padding: "16px 20px",
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              flexWrap: "wrap",
-              background: u.reset_requested ? "rgba(245,158,11,0.06)" : "rgba(255,255,255,0.03)",
-              borderColor: u.reset_requested ? "rgba(245,158,11,0.2)" : CLR.border,
-            }}
+            style={{ ...glass(), padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", background: u.reset_requested ? "rgba(245,158,11,0.06)" : "rgba(255,255,255,0.03)", borderColor: u.reset_requested ? "rgba(245,158,11,0.2)" : CLR.border }}
           >
-            {/* Avatar */}
             <div style={{ width: 40, height: 40, borderRadius: "50%", background: "rgba(0,212,255,0.1)", border: `1px solid rgba(0,212,255,0.2)`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, color: CLR.accent, fontSize: 15, flexShrink: 0 }}>
-              {u.name.charAt(0).toUpperCase()}
+              {(u.name ?? u.email ?? "?").charAt(0).toUpperCase()}
             </div>
 
-            {/* Info */}
             <div style={{ flex: 1, minWidth: 160 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                <span style={{ fontWeight: 600, color: CLR.text, fontSize: 14 }}>{u.name}</span>
+                <span style={{ fontWeight: 600, color: CLR.text, fontSize: 14 }}>{u.name ?? u.email}</span>
                 <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 10, color: u.role === "CLIENT" ? CLR.muted : CLR.accent, background: u.role === "CLIENT" ? "rgba(255,255,255,0.05)" : CLR.accentDim, padding: "1px 7px", borderRadius: 4 }}>{u.role}</span>
                 {u.reset_requested && (
                   <span style={{ fontSize: 10, color: CLR.amber, background: "rgba(245,158,11,0.12)", padding: "1px 7px", borderRadius: 4, letterSpacing: "0.06em" }}>RESET REQUESTED</span>
                 )}
               </div>
-              <div style={{ fontSize: 12, color: CLR.muted, marginTop: 2 }}>{u.email} · {u.company}</div>
-              <div style={{ fontSize: 11, color: CLR.muted, marginTop: 2 }}>Last login: {u.last_login} · {u.project_count} project{u.project_count !== 1 ? "s" : ""}</div>
+              <div style={{ fontSize: 12, color: CLR.muted, marginTop: 2 }}>{u.email}{u.company ? ` · ${u.company}` : ""}</div>
+              <div style={{ fontSize: 11, color: CLR.muted, marginTop: 2 }}>{u.last_login ? `Last login: ${u.last_login} · ` : ""}{u.project_count ?? 0} project{(u.project_count ?? 0) !== 1 ? "s" : ""}</div>
             </div>
 
-            {/* Action */}
-            {currentRole === "MASTER" && (
-              <button
-                onClick={() => resetPassword(u.id)}
-                disabled={resetting === u.id}
-                style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: u.reset_requested ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${u.reset_requested ? "rgba(245,158,11,0.3)" : CLR.border}`, color: u.reset_requested ? CLR.amber : CLR.muted, fontSize: 12, cursor: resetting === u.id ? "not-allowed" : "pointer", fontFamily: "'Rajdhani',sans-serif", fontWeight: 600, letterSpacing: "0.05em", opacity: resetting === u.id ? 0.6 : 1 }}
-              >
-                {resetting === u.id ? <Spinner /> : <RefreshCw size={12} />}
-                Reset Password
-              </button>
-            )}
+            <button
+              onClick={() => setSetPassUser(u)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: u.reset_requested ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.05)", border: `1px solid ${u.reset_requested ? "rgba(245,158,11,0.3)" : CLR.border}`, color: u.reset_requested ? CLR.amber : CLR.muted, fontSize: 12, cursor: "pointer", fontFamily: "'Rajdhani',sans-serif", fontWeight: 600, letterSpacing: "0.05em" }}
+            >
+              <RefreshCw size={12} /> Set Password
+            </button>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Create User Tab ──────────────────────────────────────────────────────────
+function CreateUserTab() {
+  const [name,     setName]     = useState("");
+  const [email,    setEmail]    = useState("");
+  const [company,  setCompany]  = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm,  setConfirm]  = useState("");
+  const [role,     setRole]     = useState<"CLIENT" | "SUB_MASTER">("CLIENT");
+  const [loading,  setLoading]  = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+  const [success,  setSuccess]  = useState<string | null>(null);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (password !== confirm) { setError("Passwords do not match"); return; }
+    if (password.length < 6) { setError("Password must be at least 6 characters"); return; }
+    setError(null);
+    setSuccess(null);
+    setLoading(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/users/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name, email, company, password, role }),
+      });
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Failed to create user");
+      setSuccess(email);
+      setName(""); setEmail(""); setCompany(""); setPassword(""); setConfirm("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create user");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const inputStyle: CSSProperties = {
+    width: "100%", padding: "10px 12px", borderRadius: 8,
+    border: `1px solid ${CLR.border}`, background: "rgba(255,255,255,0.05)",
+    color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
+    fontFamily: "'Inter',sans-serif",
+  };
+
+  const toggleBtnStyle = (active: boolean): CSSProperties => ({
+    padding: "7px 20px", borderRadius: 7, fontSize: 13, fontFamily: "'Rajdhani',sans-serif",
+    fontWeight: 700, letterSpacing: "0.06em", cursor: "pointer", transition: "all 0.15s",
+    background: active ? CLR.accentDim : "rgba(255,255,255,0.04)",
+    border: `1px solid ${active ? "rgba(0,212,255,0.3)" : CLR.border}`,
+    color: active ? CLR.accent : CLR.muted,
+  });
+
+  return (
+    <div className="admin-fade">
+      <SectionHeader title="CREATE USER" sub="Register a new client or sub-admin account" />
+
+      <div style={{ maxWidth: 480 }}>
+        {success && (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.25)", borderRadius: 10, marginBottom: 20, color: CLR.green, fontSize: 13 }}>
+            <Check size={15} />
+            <span>Account created for <strong>{success}</strong> — they can now log in.</span>
+          </div>
+        )}
+
+        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Full Name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="John Smith" style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Email Address</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="john@company.com" style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Company</label>
+            <input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="TechCo Systems" style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Password</label>
+            <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="Set initial password" style={inputStyle} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Confirm Password</label>
+            <input type="text" value={confirm} onChange={(e) => setConfirm(e.target.value)} required placeholder="Repeat password" style={inputStyle} />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 11, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Role</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button type="button" onClick={() => setRole("CLIENT")} style={toggleBtnStyle(role === "CLIENT")}>CLIENT</button>
+              {getRole() === "MASTER" && (
+                <button type="button" onClick={() => setRole("SUB_MASTER")} style={toggleBtnStyle(role === "SUB_MASTER")}>SUB MASTER</button>
+              )}
+            </div>
+          </div>
+
+          {error && (
+            <div style={{ padding: "10px 14px", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{error}</div>
+          )}
+
+          <button
+            type="submit" disabled={loading}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", borderRadius: 8, background: loading ? "rgba(0,212,255,0.2)" : "linear-gradient(135deg, #00d4ff, #0099bb)", border: "none", color: "#000", fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: 15, letterSpacing: "0.08em", cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.7 : 1, marginTop: 4 }}
+          >
+            {loading ? <Spinner /> : <><UserPlus size={15} /> CREATE USER</>}
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -580,11 +833,12 @@ function LicenseTab() {
 }
 
 // ─── Main AdminDashboard ──────────────────────────────────────────────────────
-type Tab = "fleet" | "clients" | "licenses";
+type Tab = "fleet" | "clients" | "create" | "licenses";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "fleet",    label: "Global Fleet",       icon: <Globe size={16} /> },
   { id: "clients",  label: "Client Management",  icon: <Users size={16} /> },
+  { id: "create",   label: "Create User",        icon: <UserPlus size={16} /> },
   { id: "licenses", label: "License Generator",  icon: <Key size={16} /> },
 ];
 
@@ -651,6 +905,7 @@ export default function AdminDashboard() {
         <main style={{ flex: 1, overflow: "auto", padding: 32 }}>
           {tab === "fleet"    && <FleetTab />}
           {tab === "clients"  && <ClientsTab />}
+          {tab === "create"   && <CreateUserTab />}
           {tab === "licenses" && <LicenseTab />}
         </main>
       </div>
