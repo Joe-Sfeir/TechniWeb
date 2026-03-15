@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink } from "lucide-react";
 import { getToken, getRole, clearAuth } from "../lib/auth";
 
-const API_BASE = "http://localhost:8080";
+import { API_URL } from "../config";
+const API_BASE = API_URL;
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const CLR = {

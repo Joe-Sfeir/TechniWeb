@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Zap, Mail, Lock, ArrowRight, AlertCircle, ShieldCheck, ArrowLeft } from "lucide-react";
 import { setAuth } from "../lib/auth";
 
-const API_BASE = "http://localhost:8080";
+const API_BASE = import.meta.env.VITE_API_BASE || "https://technicloudapi.onrender.com";
 type Step = "credentials" | "2fa";
 
 export default function Login() {
@@ -27,12 +27,13 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json().catch(() => ({})) as Record<string, unknown>;
-      if (!res.ok) throw new Error((data.message as string) ?? "Invalid credentials");
+      if (!res.ok) throw new Error((data.error as string) ?? "Invalid credentials");
       if (data.requires_2fa) {
         setStep("2fa");
-      } else if (data.token && data.role) {
-        setAuth(data.token as string, data.role as string);
-        navigate((data.role as string) === "CLIENT" ? "/dashboard" : "/admin", { replace: true });
+      } else if (data.token && data.user) {
+        const user = data.user as { id: number; email: string; role: string };
+        setAuth(data.token as string, user.role);
+        navigate(user.role === "CLIENT" ? "/dashboard" : "/admin", { replace: true });
       } else {
         throw new Error("Unexpected server response");
       }
@@ -54,10 +55,11 @@ export default function Login() {
         body: JSON.stringify({ email, code: otp }),
       });
       const data = await res.json().catch(() => ({})) as Record<string, unknown>;
-      if (!res.ok) throw new Error((data.message as string) ?? "Invalid code");
-      if (data.token && data.role) {
-        setAuth(data.token as string, data.role as string);
-        navigate((data.role as string) === "CLIENT" ? "/dashboard" : "/admin", { replace: true });
+      if (!res.ok) throw new Error((data.error as string) ?? "Invalid code");
+      if (data.token && data.user) {
+        const user = data.user as { id: number; email: string; role: string };
+        setAuth(data.token as string, user.role);
+        navigate(user.role === "CLIENT" ? "/dashboard" : "/admin", { replace: true });
       } else {
         throw new Error("Unexpected server response");
       }

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { API_URL } from "../config";
 import { useNavigate } from "react-router-dom";
 import {
   Zap, LogOut, Building2, Hospital, Server, Factory,
@@ -63,7 +64,7 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:8080/api/projects", {
+      const res = await fetch(`${API_URL}/api/projects`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.status === 401) { navigate("/login"); return; }
