@@ -151,8 +151,21 @@ export default function Dashboard() {
             ))}
           </nav>
 
-          {/* Sign out */}
-          <div style={{ padding: "12px 10px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          {/* Bottom buttons */}
+          <div style={{ padding: "12px 10px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 6 }}>
+            <button onClick={() => navigate("/")} style={{
+              display: "flex", alignItems: "center", gap: 8, width: "100%",
+              padding: "9px 12px", borderRadius: 8,
+              background: "transparent", border: "1px solid rgba(255,255,255,0.07)",
+              color: "rgba(255,255,255,0.35)", cursor: "pointer",
+              fontFamily: "'Rajdhani',sans-serif", fontWeight: 600,
+              fontSize: "0.83rem", letterSpacing: "0.04em", transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.color = "rgba(255,255,255,0.65)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; }}
+            >
+              ← Main Website
+            </button>
             <button onClick={handleLogout} style={{
               display: "flex", alignItems: "center", gap: 8, width: "100%",
               padding: "9px 12px", borderRadius: 8,

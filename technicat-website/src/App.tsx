@@ -9,6 +9,7 @@ const Dashboard      = lazy(() => import("./pages/Dashboard"));
 const ProjectView    = lazy(() => import("./pages/ProjectView"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const Careers        = lazy(() => import("./pages/Careers"));
+const Projects       = lazy(() => import("./pages/Projects"));
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/careers" element={<Careers />} />
+          <Route path="/projects" element={<Projects />} />
           <Route
             path="/dashboard"
             element={
