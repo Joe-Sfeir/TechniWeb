@@ -4,6 +4,49 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme CSS variables ───────────────────────────────────── */
+:root {
+  --t-bg:          #ffffff;
+  --t-bg2:         #f8fafc;
+  --t-bg3:         #f1f5f9;
+  --t-card:        #ffffff;
+  --t-fg:          #0f172a;
+  --t-fg2:         #334155;
+  --t-fg3:         #475569;
+  --t-muted:       #64748b;
+  --t-muted2:      #94a3b8;
+  --t-border:      #e2e8f0;
+  --t-border2:     #f1f5f9;
+  --t-nav:         rgba(255,255,255,0.97);
+  --t-nav-border:  rgba(226,232,240,0.8);
+  --t-blue-tint:   #eff6ff;
+  --t-blue-ring:   rgba(37,99,235,0.08);
+  --t-input:       #f8fafc;
+  --t-selection:   rgba(37,99,235,0.15);
+  --t-select-text: #1e3a8a;
+}
+
+html.dark {
+  --t-bg:          #0f172a;
+  --t-bg2:         #111827;
+  --t-bg3:         #1e293b;
+  --t-card:        #1e293b;
+  --t-fg:          #f1f5f9;
+  --t-fg2:         #cbd5e1;
+  --t-fg3:         #94a3b8;
+  --t-muted:       #94a3b8;
+  --t-muted2:      #64748b;
+  --t-border:      #334155;
+  --t-border2:     #1e293b;
+  --t-nav:         rgba(15,23,42,0.97);
+  --t-nav-border:  rgba(255,255,255,0.07);
+  --t-blue-tint:   rgba(37,99,235,0.18);
+  --t-blue-ring:   rgba(37,99,235,0.12);
+  --t-input:       #1e293b;
+  --t-selection:   rgba(96,165,250,0.2);
+  --t-select-text: #93c5fd;
+}
+
 @layer base {
   *, *::before, *::after { box-sizing: border-box; }
 
@@ -17,6 +60,16 @@
     @apply bg-white text-slate-800 font-sans;
     margin: 0;
     overflow-x: hidden;
+  }
+
+  html.dark body {
+    background: var(--t-bg);
+    color: var(--t-fg);
+  }
+
+  ::selection {
+    background: var(--t-selection);
+    color: var(--t-select-text);
   }
 
   #root {
