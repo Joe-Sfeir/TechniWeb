@@ -203,7 +203,7 @@ function FleetTab() {
         const errText = await res.text().catch(() => "Request failed");
         throw new Error(errText || "Request failed");
       }
-      await fetchData();
+      setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, user_id: userId } : p));
       setAssignSel((prev) => { const n = { ...prev }; delete n[projectId]; return n; });
       setAssignMsg((prev) => ({ ...prev, [projectId]: { ok: true, text: "Project assigned successfully" } }));
       setTimeout(() => setAssignMsg((prev) => { const n = { ...prev }; delete n[projectId]; return n; }), 3000);
