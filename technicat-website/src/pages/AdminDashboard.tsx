@@ -164,19 +164,22 @@ function FleetTab() {
   const [loading,   setLoading]   = useState(true);
   const [assignSel, setAssignSel] = useState<Record<string, string>>({});
   const [assigning, setAssigning] = useState<Record<string, boolean>>({});
+  const [assignMsg, setAssignMsg] = useState<Record<string, { ok: boolean; text: string }>>({});
 
-  useEffect(() => {
+  async function fetchData() {
     const token = getToken();
     const headers = { Authorization: `Bearer ${token}` };
-    Promise.all([
+    const [pd, ud] = await Promise.all([
       fetch(`${API_BASE}/api/admin/projects`, { headers }).then((r) => r.json()),
       fetch(`${API_BASE}/api/admin/users`,    { headers }).then((r) => r.json()),
-    ])
-      .then(([pd, ud]) => {
-        setProjects(Array.isArray(pd) ? pd : pd.projects ?? []);
-        const allUsers: User[] = Array.isArray(ud) ? ud : ud.users ?? [];
-        setUsers(allUsers.filter((u) => u.role === "CLIENT"));
-      })
+    ]);
+    setProjects(Array.isArray(pd) ? pd : pd.projects ?? []);
+    const allUsers: User[] = Array.isArray(ud) ? ud : ud.users ?? [];
+    setUsers(allUsers.filter((u) => u.role === "CLIENT"));
+  }
+
+  useEffect(() => {
+    fetchData()
       .catch(() => {
         setProjects(DEMO_PROJECTS);
         setUsers(DEMO_USERS.filter((u) => u.role === "CLIENT"));
@@ -191,15 +194,23 @@ function FleetTab() {
     setAssigning((prev) => ({ ...prev, [projectId]: true }));
     try {
       const token = getToken();
-      const res = await fetch(`${API_BASE}/api/admin/projects/assign`, {
-        method: "POST",
+      const res = await fetch(`${API_BASE}/api/admin/projects/${projectId}/assign`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ project_id: projectId, user_id: userId }),
+        body: JSON.stringify({ user_id: userId }),
       });
-      if (!res.ok) throw new Error("assign failed");
-      setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, user_id: userId } : p));
-    } catch {
-      setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, user_id: userId } : p));
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "Request failed");
+        throw new Error(errText || "Request failed");
+      }
+      await fetchData();
+      setAssignSel((prev) => { const n = { ...prev }; delete n[projectId]; return n; });
+      setAssignMsg((prev) => ({ ...prev, [projectId]: { ok: true, text: "Project assigned successfully" } }));
+      setTimeout(() => setAssignMsg((prev) => { const n = { ...prev }; delete n[projectId]; return n; }), 3000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Assignment failed";
+      setAssignMsg((prev) => ({ ...prev, [projectId]: { ok: false, text: msg } }));
+      setTimeout(() => setAssignMsg((prev) => { const n = { ...prev }; delete n[projectId]; return n; }), 4000);
     } finally {
       setAssigning((prev) => ({ ...prev, [projectId]: false }));
     }
@@ -321,13 +332,20 @@ function FleetTab() {
                         </select>
                       </td>
                       <td style={tdStyle}>
-                        <button
-                          disabled={!assignSel[p.id] || assigning[p.id]}
-                          onClick={() => assign(p.id)}
-                          style={{ display: "inline-flex", alignItems: "center", gap: 5, background: assignSel[p.id] ? CLR.amberBg : "#f8fafc", border: `1px solid ${assignSel[p.id] ? CLR.amberBdr : CLR.border}`, borderRadius: 6, padding: "5px 12px", color: assignSel[p.id] ? CLR.amber : CLR.muted, fontSize: 12, cursor: assignSel[p.id] ? "pointer" : "not-allowed", fontWeight: 700, whiteSpace: "nowrap" }}
-                        >
-                          {assigning[p.id] ? <Spinner /> : "Assign"}
-                        </button>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <button
+                            disabled={!assignSel[p.id] || assigning[p.id]}
+                            onClick={() => assign(p.id)}
+                            style={{ display: "inline-flex", alignItems: "center", gap: 5, background: assignSel[p.id] ? CLR.amberBg : "#f8fafc", border: `1px solid ${assignSel[p.id] ? CLR.amberBdr : CLR.border}`, borderRadius: 6, padding: "5px 12px", color: assignSel[p.id] ? CLR.amber : CLR.muted, fontSize: 12, cursor: assignSel[p.id] ? "pointer" : "not-allowed", fontWeight: 700, whiteSpace: "nowrap" }}
+                          >
+                            {assigning[p.id] ? <Spinner /> : "Assign"}
+                          </button>
+                          {assignMsg[p.id] && (
+                            <span style={{ fontSize: 11, fontWeight: 600, color: assignMsg[p.id].ok ? CLR.green : CLR.danger, background: assignMsg[p.id].ok ? CLR.greenBg : CLR.dangerBg, border: `1px solid ${assignMsg[p.id].ok ? CLR.greenBdr : CLR.dangerBdr}`, borderRadius: 5, padding: "2px 7px", whiteSpace: "nowrap" }}>
+                              {assignMsg[p.id].text}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

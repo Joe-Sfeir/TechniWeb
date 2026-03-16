@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(cd:*)",
-      "Bash(vercel:*)"
+      "Bash(vercel:*)",
+      "Bash(curl:*)"
     ]
   }
 }
