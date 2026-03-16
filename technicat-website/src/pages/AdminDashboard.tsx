@@ -677,26 +677,36 @@ function LicenseTab() {
     setError(null); setResult(null); setLoading(true);
     try {
       const token = getToken();
-      const body: Record<string, unknown> = { username, project_name: projectName, mode, protocols, ttl_days: ttl, allowed_meters: meters };
+      const backendMode      = isOffline ? "offline" : "online";
+      const backendProtocols = protocols === "RTU Only" ? "RTU" : protocols === "TCP Only" ? "TCP" : "All";
+      const body: Record<string, unknown> = {
+        user_name:      username,
+        project_name:   projectName,
+        mode:           backendMode,
+        protocols:      backendProtocols,
+        ttl_hours:      ttl * 24,
+        allowed_meters: meters,
+      };
       if (!isOffline) body.tier = tier;
       const res = await fetch(`${API_BASE}/api/admin/generate-license`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
-      const data = await res.json() as LicenseResult & { message?: string };
-      if (!res.ok) throw new Error(data.message ?? "Failed to generate license");
-      setResult(data);
-    } catch {
-      const exp = new Date();
-      exp.setDate(exp.getDate() + ttl);
-      const modeTag  = isOffline ? "AIR" : "SAS";
-      const protoTag = protocols === "RTU Only" ? "RTU" : protocols === "TCP Only" ? "TCP" : "ALL";
+      const data = await res.json() as { license_key?: string; error?: string; message?: string };
+      if (!res.ok) throw new Error(data.error ?? data.message ?? "Failed to generate license");
+      const exp = new Date(Date.now() + ttl * 86_400_000).toISOString().split("T")[0];
       setResult({
-        license_key: `TDQ-${modeTag}-${protoTag}-${Math.random().toString(36).slice(2,8).toUpperCase()}-${Math.random().toString(36).slice(2,8).toUpperCase()}`,
-        username, project_name: projectName, tier: isOffline ? undefined : tier, mode, protocols,
-        expires_at: exp.toISOString().split("T")[0],
+        license_key:  data.license_key ?? "",
+        username,
+        project_name: projectName,
+        tier:         isOffline ? undefined : tier,
+        mode,
+        protocols,
+        expires_at:   exp,
       });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate license");
     } finally {
       setLoading(false);
     }

@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cd:*)",
       "Bash(vercel:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(find:*)"
     ]
   }
 }
