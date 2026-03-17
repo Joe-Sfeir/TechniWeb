@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus } from "lucide-react";
@@ -568,9 +568,13 @@ function ClientsTab() {
   const [demo,          setDemo]          = useState(false);
   const [loading,       setLoading]       = useState(true);
   const [setPassUser,   setSetPassUser]   = useState<User | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError,   setDeleteError]   = useState<string | null>(null);
+  const [confirmDelete,   setConfirmDelete]   = useState<string | null>(null);
+  const [deleteLoading,   setDeleteLoading]   = useState(false);
+  const [deleteError,     setDeleteError]     = useState<string | null>(null);
+  const [expandedUser,    setExpandedUser]    = useState<string | null>(null);
+  const [allProjects,     setAllProjects]     = useState<Project[]>([]);
+  const [projectsLoaded,  setProjectsLoaded]  = useState(false);
+  const [projectsLoading, setProjectsLoading] = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -588,6 +592,25 @@ function ClientsTab() {
       }
     })();
   }, [navigate]);
+
+  async function toggleUserProjects(userId: string) {
+    if (expandedUser === userId) { setExpandedUser(null); return; }
+    setExpandedUser(userId);
+    if (projectsLoaded) return;
+    setProjectsLoading(true);
+    try {
+      const token = getToken();
+      const r = await fetch(`${API_BASE}/api/admin/projects`, { headers: { Authorization: `Bearer ${token}` } });
+      if (handleAuthError(r, navigate)) return;
+      const d = await r.json();
+      setAllProjects(Array.isArray(d) ? d : d.projects ?? []);
+      setProjectsLoaded(true);
+    } catch {
+      // panel will show "No projects"
+    } finally {
+      setProjectsLoading(false);
+    }
+  }
 
   async function deleteUser(userId: string) {
     setDeleteLoading(true);
@@ -636,7 +659,8 @@ function ClientsTab() {
           </div>
         )}
         {users.map((u) => (
-          <div key={u.id} style={{
+          <Fragment key={u.id}>
+          <div style={{
             ...card({ padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" as const }),
             background: u.reset_requested ? CLR.amberBg : "#ffffff",
             borderColor: u.reset_requested ? CLR.amberBdr : CLR.border,
@@ -656,6 +680,15 @@ function ClientsTab() {
               <div style={{ fontSize: 12, color: CLR.muted, marginTop: 3 }}>{u.email}{u.company ? ` · ${u.company}` : ""}</div>
               <div style={{ fontSize: 11, color: CLR.muted2, marginTop: 2 }}>{u.last_login ? `Last login: ${u.last_login} · ` : ""}{u.project_count ?? 0} project{(u.project_count ?? 0) !== 1 ? "s" : ""}</div>
             </div>
+
+            <button
+              onClick={() => toggleUserProjects(u.id)}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: expandedUser === u.id ? CLR.accentDim : "#f8fafc", border: `1px solid ${expandedUser === u.id ? "#bfdbfe" : CLR.border}`, color: expandedUser === u.id ? CLR.accent : CLR.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
+              onMouseEnter={(e) => { if (expandedUser !== u.id) { e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.color = CLR.accent; e.currentTarget.style.background = CLR.accentDim; } }}
+              onMouseLeave={(e) => { if (expandedUser !== u.id) { e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; e.currentTarget.style.background = "#f8fafc"; } }}
+            >
+              <Globe size={12} /> Projects ({u.project_count ?? 0})
+            </button>
 
             <button
               onClick={() => setSetPassUser(u)}
@@ -699,6 +732,42 @@ function ClientsTab() {
               )
             )}
           </div>
+
+          {expandedUser === u.id && (
+            <div style={{ marginTop: -4, marginLeft: 8, borderLeft: `3px solid ${CLR.accent}`, paddingLeft: 16, paddingTop: 12, paddingBottom: 12 }}>
+              {projectsLoading ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, color: CLR.muted, fontSize: 13 }}><Spinner /> Loading projects…</div>
+              ) : (() => {
+                const userProjects = allProjects.filter((p) => p.clients.some((c) => c.email === u.email));
+                if (userProjects.length === 0) {
+                  return <div style={{ fontSize: 13, color: CLR.muted2 }}>No projects assigned.</div>;
+                }
+                return (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10 }}>
+                    {userProjects.map((p) => (
+                      <div key={p.id} style={{ background: "#ffffff", border: `1px solid ${CLR.border}`, borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+                        <div style={{ fontWeight: 600, color: CLR.text, fontSize: 13 }}>{p.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" as const }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}14`, padding: "2px 7px", borderRadius: 4, border: `1px solid ${TIER_COLOR[p.tier] ?? CLR.muted}28` }}>TIER {p.tier}</span>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 500, color: STATUS_DOT[p.status], background: STATUS_BG[p.status], padding: "2px 8px", borderRadius: 20, border: `1px solid ${STATUS_DOT[p.status]}30` }}>
+                            <span style={{ width: 5, height: 5, borderRadius: "50%", background: STATUS_DOT[p.status], flexShrink: 0 }} />{p.status}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: CLR.muted2 }}>Last seen: {p.last_seen}</div>
+                        <button
+                          onClick={() => navigate(`/dashboard/${p.id}`, { state: { from: "/admin" } })}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-start", background: CLR.accentDim, border: "1px solid #bfdbfe", borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+                        >
+                          <ExternalLink size={11} /> View
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+          </Fragment>
         ))}
       </div>
     </div>
