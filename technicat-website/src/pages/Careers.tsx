@@ -2,10 +2,9 @@ import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   Zap, ArrowRight, CircuitBoard, Monitor, Gauge, Award,
-  ChevronUp, Sun, Moon, Menu, X, Check, Linkedin,
+  ChevronUp, Menu, X, Check, Linkedin,
   Mail, MapPin, Users,
 } from "lucide-react";
-import { useTheme } from "../context/ThemeContext";
 
 const ROLES = ["Electrical Engineer", "SCADA Developer", "Technician", "Internship"] as const;
 type Role = typeof ROLES[number];
@@ -22,7 +21,7 @@ const OPEN_ROLES: { title: Role; dept: string; type: string; Icon: React.Element
 ];
 
 export default function Careers() {
-  const { dark, toggle } = useTheme();
+  const dark = false;
   const [scrolled,  setScrolled]  = useState(false);
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [form,      setForm]      = useState({ name: "", email: "", role: ROLES[0] as string, letter: "" });
@@ -38,7 +37,7 @@ export default function Careers() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const subject = encodeURIComponent(`Job Application: ${form.role}`);
+    const subject = encodeURIComponent(`Job Application: ${form.role} — ${form.name}`);
     const body = encodeURIComponent([
       `Name: ${form.name}`,
       `Email: ${form.email}`,
@@ -49,7 +48,7 @@ export default function Careers() {
       ``,
       `──────────────────────────────────────────`,
       `IMPORTANT: Please attach your CV/Resume file to this email before sending.`,
-    ].join("\n"));
+    ].join("\r\n"));
     window.location.href = `mailto:joesfeir007@gmail.com?subject=${subject}&body=${body}`;
     setSubmitted(true);
   }
@@ -107,15 +106,6 @@ export default function Careers() {
                 onMouseLeave={(e) => { e.currentTarget.style.color = "var(--t-fg3)"; e.currentTarget.style.background = "none"; }}>
                 ← Back to Home
               </Link>
-              <button onClick={toggle} aria-label="Toggle dark mode" style={{
-                padding: "8px", borderRadius: 10, border: "1.5px solid var(--t-border)",
-                color: "var(--t-fg3)", background: "var(--t-card)", cursor: "pointer",
-                display: "inline-flex", alignItems: "center", transition: "all 0.2s",
-              }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#2563eb"; e.currentTarget.style.color = "#2563eb"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = dark ? "#334155" : "#e2e8f0"; e.currentTarget.style.color = dark ? "#94a3b8" : "#475569"; }}>
-                {dark ? <Sun size={15} /> : <Moon size={15} />}
-              </button>
               <a href="mailto:joesfeir007@gmail.com?subject=Project%20Inquiry%20%E2%80%94%20Technicat%20Group" style={{
                 display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 20px", borderRadius: 10,
                 fontSize: 14, fontWeight: 600, background: "#2563eb", color: "#fff", border: "none",
@@ -129,9 +119,6 @@ export default function Careers() {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8 }} className="show-mobile">
-              <button onClick={toggle} style={{ padding: "8px", borderRadius: 10, border: "1.5px solid var(--t-border)", color: "var(--t-fg3)", background: "var(--t-card)", cursor: "pointer", display: "inline-flex", alignItems: "center" }}>
-                {dark ? <Sun size={15} /> : <Moon size={15} />}
-              </button>
               <button onClick={() => setMenuOpen((o) => !o)} style={{ padding: 8, borderRadius: 8, background: "none", border: "none", cursor: "pointer", color: "var(--t-fg2)" }}>
                 {menuOpen ? <X size={22} /> : <Menu size={22} />}
               </button>

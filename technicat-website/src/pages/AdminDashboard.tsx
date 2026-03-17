@@ -54,12 +54,11 @@ const DOT_GRID = `
 interface Project {
   id: string;
   name: string;
-  client: string;
+  clients: { id: number; email: string }[];
   tier: number;
   status: "online" | "offline" | "warning";
   device_count: number;
   last_seen: string;
-  user_id?: string | null;
 }
 
 interface User {
@@ -83,13 +82,24 @@ interface LicenseResult {
   expires_at: string;
 }
 
+interface LicenseRecord {
+  id: number;
+  username: string;
+  project_name: string;
+  tier?: number;
+  mode: string;
+  protocols: string;
+  expires_at: string;
+  created_at: string;
+}
+
 // ─── Demo Data ────────────────────────────────────────────────────────────────
 const DEMO_PROJECTS: Project[] = [
-  { id: "p1", name: "HVAC Complex A",   client: "Al Noor Contracting", tier: 2, status: "online",  device_count: 6,  last_seen: "just now"  },
-  { id: "p2", name: "Data Center UPS",  client: "TechCo Systems",      tier: 3, status: "online",  device_count: 12, last_seen: "2 min ago" },
-  { id: "p3", name: "Substation Grid",  client: "Emirates Power",      tier: 1, status: "warning", device_count: 4,  last_seen: "8 min ago" },
-  { id: "p4", name: "Mall Main Incomer",client: "ReedSpace Group",      tier: 2, status: "offline", device_count: 3,  last_seen: "1 hr ago"  },
-  { id: "p5", name: "Factory Line B",   client: "Gulf Mfg Ltd",         tier: 1, status: "online",  device_count: 8,  last_seen: "just now"  },
+  { id: "p1", name: "HVAC Complex A",    clients: [{ id: 1, email: "ali@alnoor.ae" }],   tier: 2, status: "online",  device_count: 6,  last_seen: "just now"  },
+  { id: "p2", name: "Data Center UPS",   clients: [{ id: 2, email: "john@techco.com" }], tier: 3, status: "online",  device_count: 12, last_seen: "2 min ago" },
+  { id: "p3", name: "Substation Grid",   clients: [{ id: 3, email: "sara@ep.ae" }],      tier: 1, status: "warning", device_count: 4,  last_seen: "8 min ago" },
+  { id: "p4", name: "Mall Main Incomer", clients: [],                                     tier: 2, status: "offline", device_count: 3,  last_seen: "1 hr ago"  },
+  { id: "p5", name: "Factory Line B",    clients: [],                                     tier: 1, status: "online",  device_count: 8,  last_seen: "just now"  },
 ];
 
 const DEMO_USERS: User[] = [
@@ -162,9 +172,11 @@ function FleetTab() {
   const [users,     setUsers]     = useState<User[]>([]);
   const [demo,      setDemo]      = useState(false);
   const [loading,   setLoading]   = useState(true);
-  const [assignSel, setAssignSel] = useState<Record<string, string>>({});
-  const [assigning, setAssigning] = useState<Record<string, boolean>>({});
-  const [assignMsg, setAssignMsg] = useState<Record<string, { ok: boolean; text: string }>>({});
+  const [assignSel,    setAssignSel]    = useState<Record<string, string>>({});
+  const [assigning,    setAssigning]    = useState<Record<string, boolean>>({});
+  const [assignMsg,    setAssignMsg]    = useState<Record<string, { ok: boolean; text: string }>>({});
+  const [unassigning,  setUnassigning]  = useState<Record<string, boolean>>({});
+  const [unassignError, setUnassignError] = useState<Record<string, string>>({});
 
   async function fetchData() {
     const token = getToken();
@@ -209,7 +221,9 @@ function FleetTab() {
         throw new Error(errText || "Request failed");
       }
       const selectedUser = users.find((u) => String(u.id) === String(userId));
-    setProjects((prev) => prev.map((p) => p.id === projectId ? { ...p, user_id: userId, client: selectedUser?.email ?? "" } : p));
+      setProjects((prev) => prev.map((p) => p.id === projectId
+        ? { ...p, clients: [...(p.clients ?? []), { id: Number(userId), email: selectedUser?.email ?? "" }] }
+        : p));
       setAssignSel((prev) => { const n = { ...prev }; delete n[projectId]; return n; });
       setAssignMsg((prev) => ({ ...prev, [projectId]: { ok: true, text: "Project assigned successfully" } }));
       setTimeout(() => setAssignMsg((prev) => { const n = { ...prev }; delete n[projectId]; return n; }), 3000);
@@ -222,42 +236,41 @@ function FleetTab() {
     }
   }
 
+  async function unassign(projectId: string, clientId: number) {
+    const key = `${projectId}-${clientId}`;
+    setUnassigning((prev) => ({ ...prev, [key]: true }));
+    setUnassignError((prev) => { const n = { ...prev }; delete n[key]; return n; });
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/projects/${projectId}/unassign`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ user_id: clientId }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      if (!res.ok) {
+        const errText = await res.text().catch(() => "Request failed");
+        throw new Error(errText || "Request failed");
+      }
+      setProjects((prev) => prev.map((p) => p.id === projectId
+        ? { ...p, clients: p.clients.filter((c) => c.id !== clientId) }
+        : p));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Unassign failed";
+      setUnassignError((prev) => ({ ...prev, [key]: msg }));
+      setTimeout(() => setUnassignError((prev) => { const n = { ...prev }; delete n[key]; return n; }), 4000);
+    } finally {
+      setUnassigning((prev) => ({ ...prev, [key]: false }));
+    }
+  }
+
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>;
 
-  const assigned   = projects.filter((p) => p.user_id != null);
-  const unassigned = projects.filter((p) => p.user_id == null);
+  const assigned   = projects.filter((p) => p.clients.length > 0);
+  const unassigned = projects.filter((p) => p.clients.length === 0);
 
   const thStyle: CSSProperties = { textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", borderBottom: `1px solid ${CLR.border}`, background: "#f8fafc" };
   const tdStyle: CSSProperties = { padding: "12px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9` };
-
-  const projectRows = (rows: Project[]) =>
-    rows.map((p) => (
-      <tr key={p.id}>
-        <td style={{ ...tdStyle, fontWeight: 500 }}>{p.name}</td>
-        <td style={{ ...tdStyle, color: CLR.muted }}>{p.client}</td>
-        <td style={tdStyle}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}14`, padding: "2px 8px", borderRadius: 5, border: `1px solid ${TIER_COLOR[p.tier] ?? CLR.muted}28` }}>
-            TIER {p.tier}
-          </span>
-        </td>
-        <td style={tdStyle}>
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: STATUS_DOT[p.status], background: STATUS_BG[p.status], padding: "3px 9px", borderRadius: 20, border: `1px solid ${STATUS_DOT[p.status]}30` }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: STATUS_DOT[p.status], flexShrink: 0 }} />
-            {p.status}
-          </span>
-        </td>
-        <td style={{ ...tdStyle, color: CLR.muted }}>{p.device_count}</td>
-        <td style={{ ...tdStyle, color: CLR.muted }}>{p.last_seen}</td>
-        <td style={tdStyle}>
-          <button
-            onClick={() => navigate(`/dashboard/${p.id}`, { state: { from: "/admin" } })}
-            style={{ display: "inline-flex", alignItems: "center", gap: 5, background: CLR.accentDim, border: `1px solid #bfdbfe`, borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontWeight: 600 }}
-          >
-            <ExternalLink size={11} /> View
-          </button>
-        </td>
-      </tr>
-    ));
 
   return (
     <div className="admin-fade">
@@ -271,12 +284,92 @@ function FleetTab() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
               <thead>
                 <tr>
-                  {["Project", "Client", "Tier", "Status", "Devices", "Last Seen", ""].map((h) => (
+                  {["Project", "Clients", "Tier", "Status", "Devices", "Last Seen", "", "Add Client", ""].map((h) => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody>{projectRows(assigned)}</tbody>
+              <tbody>
+                {assigned.map((p) => (
+                  <tr key={p.id}>
+                    <td style={{ ...tdStyle, fontWeight: 500 }}>{p.name}</td>
+                    <td style={tdStyle}>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, alignItems: "flex-start" }}>
+                        {p.clients.map((c) => {
+                          const key = `${p.id}-${c.id}`;
+                          return (
+                            <div key={c.id} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 4, background: CLR.accentDim, border: "1px solid #bfdbfe", borderRadius: 5, padding: "2px 7px", fontSize: 12, color: CLR.accent, fontWeight: 500 }}>
+                                {c.email}
+                                <button
+                                  onClick={() => unassign(p.id, c.id)}
+                                  disabled={unassigning[key]}
+                                  title="Remove client"
+                                  style={{ background: "none", border: "none", padding: 0, cursor: unassigning[key] ? "not-allowed" : "pointer", display: "flex", alignItems: "center", color: CLR.muted, lineHeight: 1 }}
+                                >
+                                  {unassigning[key] ? <Spinner /> : <X size={11} />}
+                                </button>
+                              </span>
+                              {unassignError[key] && (
+                                <span style={{ fontSize: 10, color: CLR.danger }}>{unassignError[key]}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}14`, padding: "2px 8px", borderRadius: 5, border: `1px solid ${TIER_COLOR[p.tier] ?? CLR.muted}28` }}>
+                        TIER {p.tier}
+                      </span>
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: STATUS_DOT[p.status], background: STATUS_BG[p.status], padding: "3px 9px", borderRadius: 20, border: `1px solid ${STATUS_DOT[p.status]}30` }}>
+                        <span style={{ width: 6, height: 6, borderRadius: "50%", background: STATUS_DOT[p.status], flexShrink: 0 }} />
+                        {p.status}
+                      </span>
+                    </td>
+                    <td style={{ ...tdStyle, color: CLR.muted }}>{p.device_count}</td>
+                    <td style={{ ...tdStyle, color: CLR.muted }}>{p.last_seen}</td>
+                    <td style={tdStyle}>
+                      <button
+                        onClick={() => navigate(`/dashboard/${p.id}`, { state: { from: "/admin" } })}
+                        style={{ display: "inline-flex", alignItems: "center", gap: 5, background: CLR.accentDim, border: `1px solid #bfdbfe`, borderRadius: 6, padding: "5px 10px", color: CLR.accent, fontSize: 12, cursor: "pointer", fontWeight: 600 }}
+                      >
+                        <ExternalLink size={11} /> View
+                      </button>
+                    </td>
+                    <td style={tdStyle}>
+                      <select
+                        value={assignSel[p.id] ?? ""}
+                        onChange={(e) => setAssignSel((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                        style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: assignSel[p.id] ? CLR.text : CLR.muted, fontSize: 13, outline: "none", cursor: "pointer", minWidth: 160 }}
+                      >
+                        <option value="" disabled>Add client…</option>
+                        {users.filter((u) => !p.clients.some((c) => String(c.id) === String(u.id))).map((u) => (
+                          <option key={u.id} value={u.id}>{u.email}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <button
+                          disabled={!assignSel[p.id] || assigning[p.id]}
+                          onClick={() => assign(p.id)}
+                          style={{ display: "inline-flex", alignItems: "center", gap: 5, background: assignSel[p.id] ? CLR.accentDim : "#f8fafc", border: `1px solid ${assignSel[p.id] ? "#bfdbfe" : CLR.border}`, borderRadius: 6, padding: "5px 12px", color: assignSel[p.id] ? CLR.accent : CLR.muted, fontSize: 12, cursor: assignSel[p.id] ? "pointer" : "not-allowed", fontWeight: 700, whiteSpace: "nowrap" }}
+                        >
+                          {assigning[p.id] ? <Spinner /> : "Add"}
+                        </button>
+                        {assignMsg[p.id] && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: assignMsg[p.id].ok ? CLR.green : CLR.danger, background: assignMsg[p.id].ok ? CLR.greenBg : CLR.dangerBg, border: `1px solid ${assignMsg[p.id].ok ? CLR.greenBdr : CLR.dangerBdr}`, borderRadius: 5, padding: "2px 7px", whiteSpace: "nowrap" }}>
+                            {assignMsg[p.id].text}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         </div>
@@ -294,7 +387,7 @@ function FleetTab() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
                 <thead>
                   <tr>
-                    {["Project", "Client", "Tier", "Status", "Devices", "Last Seen", "", "Assign To", ""].map((h) => (
+                    {["Project", "Tier", "Status", "Devices", "Last Seen", "", "Assign To", ""].map((h) => (
                       <th key={h} style={{ ...thStyle, background: "#fffbeb" }}>{h}</th>
                     ))}
                   </tr>
@@ -303,7 +396,6 @@ function FleetTab() {
                   {unassigned.map((p) => (
                     <tr key={p.id} style={{ background: "#fffdf5" }}>
                       <td style={{ ...tdStyle, fontWeight: 500 }}>{p.name}</td>
-                      <td style={{ ...tdStyle, color: CLR.muted }}>{p.client}</td>
                       <td style={tdStyle}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}14`, padding: "2px 8px", borderRadius: 5, border: `1px solid ${TIER_COLOR[p.tier] ?? CLR.muted}28` }}>
                           TIER {p.tier}
@@ -472,10 +564,13 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
 // ─── Clients Tab ──────────────────────────────────────────────────────────────
 function ClientsTab() {
   const navigate = useNavigate();
-  const [users,       setUsers]       = useState<User[]>([]);
-  const [demo,        setDemo]        = useState(false);
-  const [loading,     setLoading]     = useState(true);
-  const [setPassUser, setSetPassUser] = useState<User | null>(null);
+  const [users,         setUsers]         = useState<User[]>([]);
+  const [demo,          setDemo]          = useState(false);
+  const [loading,       setLoading]       = useState(true);
+  const [setPassUser,   setSetPassUser]   = useState<User | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError,   setDeleteError]   = useState<string | null>(null);
 
   useEffect(() => {
     const token = getToken();
@@ -493,6 +588,29 @@ function ClientsTab() {
       }
     })();
   }, [navigate]);
+
+  async function deleteUser(userId: string) {
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (handleAuthError(res, navigate)) return;
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as Record<string, unknown>;
+        throw new Error((d.error as string) ?? "Failed to delete user");
+      }
+      setUsers((prev) => prev.filter((u) => u.id !== userId));
+      setConfirmDelete(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete user");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>;
 
@@ -547,6 +665,39 @@ function ClientsTab() {
             >
               <RefreshCw size={12} /> Set Password
             </button>
+
+            {u.role !== "MASTER" && (
+              confirmDelete === u.id ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                  <span style={{ fontSize: 12, color: CLR.danger, fontWeight: 600 }}>Are you sure?</span>
+                  {deleteError && <span style={{ fontSize: 11, color: CLR.danger }}>{deleteError}</span>}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      onClick={() => deleteUser(u.id)}
+                      disabled={deleteLoading}
+                      style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: 7, background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, color: CLR.danger, fontSize: 12, fontWeight: 700, cursor: deleteLoading ? "not-allowed" : "pointer", opacity: deleteLoading ? 0.65 : 1 }}
+                    >
+                      {deleteLoading ? <Spinner /> : "Delete"}
+                    </button>
+                    <button
+                      onClick={() => { setConfirmDelete(null); setDeleteError(null); }}
+                      style={{ padding: "6px 12px", borderRadius: 7, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 12, cursor: "pointer" }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => { setConfirmDelete(u.id); setDeleteError(null); }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = CLR.dangerBdr; e.currentTarget.style.color = CLR.danger; e.currentTarget.style.background = CLR.dangerBg; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; e.currentTarget.style.background = "#f8fafc"; }}
+                >
+                  <X size={12} /> Delete
+                </button>
+              )
+            )}
           </div>
         ))}
       </div>
@@ -675,10 +826,29 @@ function LicenseTab() {
   const [protocols,   setProtocols]   = useState<LicenseProtocol>("All Protocols");
   const [ttl,         setTtl]         = useState(365);
   const [meters,      setMeters]      = useState<string[]>(["schneider_pm2220"]);
-  const [loading,     setLoading]     = useState(false);
-  const [result,      setResult]      = useState<LicenseResult | null>(null);
-  const [copied,      setCopied]      = useState(false);
-  const [error,       setError]       = useState<string | null>(null);
+  const [loading,        setLoading]        = useState(false);
+  const [result,         setResult]         = useState<LicenseResult | null>(null);
+  const [copied,         setCopied]         = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+  const [licenseHistory, setLicenseHistory] = useState<LicenseRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError,   setHistoryError]   = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = getToken();
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/api/admin/licenses`, { headers: { Authorization: `Bearer ${token}` } });
+        if (handleAuthError(r, navigate)) return;
+        const d = await r.json();
+        setLicenseHistory(Array.isArray(d) ? d : d.licenses ?? []);
+      } catch {
+        setHistoryError("Could not load license history.");
+      } finally {
+        setHistoryLoading(false);
+      }
+    })();
+  }, [navigate]);
 
   const isOffline = mode === "Offline Air-Gapped";
 
@@ -877,6 +1047,52 @@ function LicenseTab() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* License History */}
+      <div style={{ marginTop: 40 }}>
+        <div style={{ marginBottom: 16 }}>
+          <h3 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 16, color: CLR.text, letterSpacing: "-0.02em", margin: 0 }}>License History</h3>
+          <p style={{ fontSize: 13, color: CLR.muted, marginTop: 4, marginBottom: 0 }}>All previously generated licenses</p>
+        </div>
+        {historyLoading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: 32 }}><Spinner /></div>
+        ) : historyError ? (
+          <div style={{ padding: "10px 14px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{historyError}</div>
+        ) : licenseHistory.length === 0 ? (
+          <div style={{ ...card({ padding: 24, textAlign: "center", color: CLR.muted, fontSize: 13 }) }}>No licenses generated yet.</div>
+        ) : (
+          <div style={{ ...card(), overflow: "hidden" }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
+                <thead>
+                  <tr>
+                    {["Username", "Project", "Mode", "Tier", "Protocols", "Expires", "Created"].map((h) => (
+                      <th key={h} style={{ textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase" as const, whiteSpace: "nowrap" as const, borderBottom: `1px solid ${CLR.border}`, background: "#f8fafc" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {licenseHistory.map((r) => (
+                    <tr key={r.id}>
+                      <td style={{ padding: "11px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9`, fontWeight: 500 }}>{r.username}</td>
+                      <td style={{ padding: "11px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>{r.project_name}</td>
+                      <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>{r.mode}</td>
+                      <td style={{ padding: "11px 14px", fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>
+                        {r.tier != null ? (
+                          <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[r.tier] ?? CLR.muted, background: `${TIER_COLOR[r.tier] ?? CLR.muted}14`, padding: "2px 8px", borderRadius: 5, border: `1px solid ${TIER_COLOR[r.tier] ?? CLR.muted}28` }}>TIER {r.tier}</span>
+                        ) : <span style={{ color: CLR.muted2 }}>—</span>}
+                      </td>
+                      <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>{r.protocols}</td>
+                      <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9`, whiteSpace: "nowrap" as const }}>{r.expires_at}</td>
+                      <td style={{ padding: "11px 14px", color: CLR.muted2, fontSize: 12, borderBottom: `1px solid #f1f5f9`, whiteSpace: "nowrap" as const }}>{r.created_at}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
