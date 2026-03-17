@@ -5,7 +5,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
 import { ChevronLeft, Sun, Moon, LogOut, Download } from "lucide-react";
-import { getToken } from "../lib/auth";
+import { getToken, handleAuthError } from "../lib/auth";
 import { API_URL } from "../config";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -314,6 +314,7 @@ export default function ProjectView() {
   const [loading,     setLoading]     = useState(true);
   const [demoMode,    setDemoMode]    = useState(false);
   const [exporting,   setExporting]   = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const lastTimestampRef = useRef<string | null>(null);
   const isDark           = theme === "dark";
@@ -404,58 +405,63 @@ export default function ProjectView() {
   useEffect(() => {
     if (!projectId) return;
     const token = getToken();
-    fetch(`${API_URL}/api/telemetry/${projectId}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => {
+    (async () => {
+      try {
+        const r = await fetch(`${API_URL}/api/telemetry/${projectId}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (handleAuthError(r, navigate)) return;
         if (!r.ok) throw new Error("fetch failed");
-        return r.json() as Promise<{ project_name?: string; rows: TelemetryRow[] } | TelemetryRow[]>;
-      })
-      .then((data) => {
+        const data = await r.json() as { project_name?: string; rows: TelemetryRow[] } | TelemetryRow[];
         const rows = Array.isArray(data) ? data : (data.rows ?? []);
         if (!Array.isArray(data) && data.project_name) setProjectName(data.project_name);
         processRows(rows, true);
-      })
-      .catch(() => {
+      } catch {
         processRows(DEMO_ROWS, true);
         setDemoMode(true);
-      })
-      .finally(() => setLoading(false));
-  }, [projectId, processRows]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [projectId, processRows, navigate]);
 
   // ── Polling ──
   useEffect(() => {
     if (loading || demoMode || !projectId) return;
     const token = getToken();
-    const id = setInterval(() => {
+    const id = setInterval(async () => {
       const since = lastTimestampRef.current;
       const url   = `${API_URL}/api/telemetry/${projectId}${since ? `?since=${encodeURIComponent(since)}` : ""}`;
-      fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-        .then((r) => r.ok ? r.json() : Promise.reject())
-        .then((data) => {
-          const rows = Array.isArray(data) ? data : (data.rows ?? []);
-          if (rows.length > 0) processRows(rows, false);
-          else setLastPollMs(Date.now());
-        })
-        .catch(() => {});
+      try {
+        const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+        if (handleAuthError(r, navigate)) return;
+        if (!r.ok) return;
+        const data = await r.json() as { rows?: TelemetryRow[] } | TelemetryRow[];
+        const rows = Array.isArray(data) ? data : (data.rows ?? []);
+        if (rows.length > 0) processRows(rows, false);
+        else setLastPollMs(Date.now());
+      } catch { /* silent for transient network failures */ }
     }, POLL_MS);
     return () => clearInterval(id);
-  }, [loading, demoMode, projectId, processRows]);
+  }, [loading, demoMode, projectId, processRows, navigate]);
 
   // ── Export ──
   const handleExport = useCallback(async () => {
     if (!projectId) return;
     setExporting(true);
+    setExportError(null);
     try {
       const token = getToken();
       const res   = await fetch(`${API_URL}/api/export/${projectId}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error("export failed");
+      if (handleAuthError(res, navigate)) return;
+      if (!res.ok) throw new Error("Export failed. Please try again.");
       const blob = await res.blob();
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement("a");
       a.href = url; a.download = `project_${projectId}_export.xlsx`;
       a.click(); URL.revokeObjectURL(url);
-    } catch { /* silent */ }
-    finally { setExporting(false); }
-  }, [projectId]);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed.");
+    } finally { setExporting(false); }
+  }, [projectId, navigate]);
 
   // ── Derived ──
   const activeDevVars  = useMemo(() => {
@@ -571,6 +577,13 @@ export default function ProjectView() {
 
       {/* ══ Content ══ */}
       <div style={{ flex: 1, overflow: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+
+        {/* Export error */}
+        {exportError && (
+          <div style={{ padding: "10px 14px", borderRadius: 8, background: `${CLR.red}15`, border: `1px solid ${CLR.red}40`, color: CLR.red, fontSize: "0.75rem", fontFamily: "'Inter',sans-serif" }}>
+            {exportError}
+          </div>
+        )}
 
         {/* Variable pills */}
         {activeDevVars.length > 0 && (

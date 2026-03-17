@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { API_URL } from "../config";
 import { useNavigate } from "react-router-dom";
+import { handleAuthError } from "../lib/auth";
 import {
   Zap, LogOut, Building2, Hospital, Server, Factory,
   Activity, ChevronRight, AlertTriangle, RefreshCw,
@@ -68,7 +69,7 @@ export default function Dashboard() {
       const res = await fetch(`${API_URL}/api/projects`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.status === 401) { navigate("/login"); return; }
+      if (handleAuthError(res, navigate)) return;
       if (!res.ok) throw new Error("Server error");
       const data = await res.json() as Project[];
       setProjects(data);

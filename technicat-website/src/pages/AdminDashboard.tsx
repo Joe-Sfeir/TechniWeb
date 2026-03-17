@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
 import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus } from "lucide-react";
-import { getToken, getRole, clearAuth } from "../lib/auth";
+import { getToken, getRole, clearAuth, handleAuthError } from "../lib/auth";
 
 import { API_URL } from "../config";
 const API_BASE = API_URL;
@@ -169,10 +169,14 @@ function FleetTab() {
   async function fetchData() {
     const token = getToken();
     const headers = { Authorization: `Bearer ${token}` };
-    const [pd, ud] = await Promise.all([
-      fetch(`${API_BASE}/api/admin/projects`, { headers }).then((r) => r.json()),
-      fetch(`${API_BASE}/api/admin/users`,    { headers }).then((r) => r.json()),
+    const [pr, ur] = await Promise.all([
+      fetch(`${API_BASE}/api/admin/projects`, { headers }),
+      fetch(`${API_BASE}/api/admin/users`,    { headers }),
     ]);
+    if (handleAuthError(pr, navigate) || handleAuthError(ur, navigate)) return;
+    if (!pr.ok || !ur.ok) throw new Error("Server error");
+    const pd = await pr.json();
+    const ud = await ur.json();
     setProjects(Array.isArray(pd) ? pd : pd.projects ?? []);
     const allUsers: User[] = Array.isArray(ud) ? ud : ud.users ?? [];
     setUsers(allUsers.filter((u) => u.role === "CLIENT"));
@@ -199,6 +203,7 @@ function FleetTab() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ user_id: userId }),
       });
+      if (handleAuthError(res, navigate)) return;
       if (!res.ok) {
         const errText = await res.text().catch(() => "Request failed");
         throw new Error(errText || "Request failed");
@@ -367,6 +372,7 @@ function FleetTab() {
 
 // ─── Set Password Modal ───────────────────────────────────────────────────────
 function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: () => void; onSuccess: (userId: string) => void }) {
+  const navigate = useNavigate();
   const [newPass,     setNewPass]     = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [loading,     setLoading]     = useState(false);
@@ -387,13 +393,13 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ user_id: user.id, new_password: newPass }),
       });
+      if (handleAuthError(res, navigate)) return;
       const data = await res.json().catch(() => ({})) as Record<string, unknown>;
       if (!res.ok) throw new Error((data.error as string) ?? "Failed to set password");
       setDone(true);
       onSuccess(user.id);
-    } catch {
-      setDone(true);
-      onSuccess(user.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to set password");
     } finally {
       setLoading(false);
     }
@@ -464,6 +470,7 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
 
 // ─── Clients Tab ──────────────────────────────────────────────────────────────
 function ClientsTab() {
+  const navigate = useNavigate();
   const [users,       setUsers]       = useState<User[]>([]);
   const [demo,        setDemo]        = useState(false);
   const [loading,     setLoading]     = useState(true);
@@ -471,12 +478,20 @@ function ClientsTab() {
 
   useEffect(() => {
     const token = getToken();
-    fetch(`${API_BASE}/api/admin/users`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => r.json())
-      .then((d) => setUsers(Array.isArray(d) ? d : d.users ?? []))
-      .catch(() => { setUsers(DEMO_USERS); setDemo(true); })
-      .finally(() => setLoading(false));
-  }, []);
+    (async () => {
+      try {
+        const r = await fetch(`${API_BASE}/api/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
+        if (handleAuthError(r, navigate)) return;
+        const d = await r.json();
+        setUsers(Array.isArray(d) ? d : d.users ?? []);
+      } catch {
+        setUsers(DEMO_USERS);
+        setDemo(true);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [navigate]);
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>;
 
@@ -540,6 +555,7 @@ function ClientsTab() {
 
 // ─── Create User Tab ──────────────────────────────────────────────────────────
 function CreateUserTab() {
+  const navigate = useNavigate();
   const [name,     setName]     = useState("");
   const [email,    setEmail]    = useState("");
   const [company,  setCompany]  = useState("");
@@ -562,6 +578,7 @@ function CreateUserTab() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ full_name: name, email, company, password, role }),
       });
+      if (handleAuthError(res, navigate)) return;
       const data = await res.json().catch(() => ({})) as Record<string, unknown>;
       if (!res.ok) throw new Error((data.error as string) ?? (data.message as string) ?? "Failed to create user");
       setSuccess(email);
@@ -649,6 +666,7 @@ type LicenseMode     = "Offline Air-Gapped" | "Online SaaS";
 type LicenseProtocol = "RTU Only" | "TCP Only" | "All Protocols";
 
 function LicenseTab() {
+  const navigate = useNavigate();
   const [username,    setUsername]    = useState("");
   const [projectName, setProjectName] = useState("");
   const [tier,        setTier]        = useState(1);
@@ -693,6 +711,7 @@ function LicenseTab() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
+      if (handleAuthError(res, navigate)) return;
       const data = await res.json() as { license_key?: string; error?: string; message?: string };
       if (!res.ok) throw new Error(data.error ?? data.message ?? "Failed to generate license");
       const exp = new Date(Date.now() + ttl * 86_400_000).toISOString().split("T")[0];

@@ -3,8 +3,7 @@ import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Zap, Mail, Lock, ArrowRight, AlertCircle, ShieldCheck, ArrowLeft } from "lucide-react";
 import { setAuth, getToken, getRole } from "../lib/auth";
-
-const API_BASE = import.meta.env.VITE_API_BASE || "https://technicloudapi.onrender.com";
+import { API_URL } from "../config";
 type Step = "credentials" | "2fa";
 
 export default function Login() {
@@ -33,7 +32,7 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -66,13 +65,12 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/auth/verify-2fa`, {
+      const res = await fetch(`${API_URL}/api/auth/verify-2fa`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, code: otp }),
       });
       const text = await res.text();
-      console.log("[2FA] Response status:", res.status, "body:", text);
       let data: Record<string, unknown> = {};
       try { data = JSON.parse(text); } catch { /* empty */ }
       if (!res.ok) throw new Error((data.error as string) ?? "Invalid code");
@@ -85,7 +83,6 @@ export default function Login() {
         throw new Error("Unexpected server response");
       }
     } catch (err) {
-      console.error("[2FA] Error:", err);
       setError(err instanceof Error ? err.message : "Verification failed");
     } finally {
       setLoading(false);

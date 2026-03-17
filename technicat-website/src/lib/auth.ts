@@ -24,3 +24,23 @@ export function decodeRole(token: string): string | null {
     return null;
   }
 }
+
+export function isTokenValid(): boolean {
+  const token = getToken();
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return typeof payload.exp === "number" && payload.exp > Date.now() / 1000;
+  } catch {
+    return false;
+  }
+}
+
+export function handleAuthError(res: Response, navigate: (path: string) => void): boolean {
+  if (res.status === 401) {
+    clearAuth();
+    navigate("/login");
+    return true;
+  }
+  return false;
+}

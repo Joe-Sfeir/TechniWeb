@@ -4,7 +4,8 @@
       "Bash(cd:*)",
       "Bash(vercel:*)",
       "Bash(curl:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
