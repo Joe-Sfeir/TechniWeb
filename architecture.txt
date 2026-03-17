@@ -1,0 +1,354 @@
+================================================================================
+TECHNICAT WEBSITE — ARCHITECTURE SNAPSHOT
+Generated: 2026-03-17
+================================================================================
+
+DIRECTORY TREE
+--------------
+/c/Users/Joe/Desktop/website
+├── .claude/
+│   └── settings.local.json
+├── .vercel/
+│   ├── project.json
+│   └── README.txt
+├── .gitignore
+├── package.json
+├── package-lock.json
+└── technicat-website/          ← actual project root
+    ├── .env
+    ├── .gitignore
+    ├── .vercel/
+    │   ├── project.json
+    │   └── README.txt
+    ├── eslint.config.js
+    ├── index.css
+    ├── index.html
+    ├── package.json
+    ├── package-lock.json
+    ├── postcss.config.js
+    ├── public/
+    │   ├── favicon.svg
+    │   └── icons.svg
+    ├── README.md
+    ├── reference_desktop_ui.txt
+    ├── src/
+    │   ├── App.css
+    │   ├── App.tsx
+    │   ├── assets/
+    │   │   ├── hero.png
+    │   │   ├── react.svg
+    │   │   └── vite.svg
+    │   ├── components/
+    │   │   ├── AdminRoute.tsx
+    │   │   └── ProtectedRoute.tsx
+    │   ├── config.ts
+    │   ├── context/
+    │   │   └── ThemeContext.tsx
+    │   ├── index.css
+    │   ├── lib/
+    │   │   └── auth.ts
+    │   ├── main.tsx
+    │   └── pages/
+    │       ├── AdminDashboard.tsx
+    │       ├── Careers.tsx
+    │       ├── Dashboard.tsx
+    │       ├── Landing.tsx
+    │       ├── Login.tsx
+    │       ├── Projects.tsx
+    │       └── ProjectView.tsx
+    ├── tailwind.config.js
+    ├── tsconfig.app.json
+    ├── tsconfig.json
+    ├── tsconfig.node.json
+    ├── vercel.json
+    └── vite.config.ts
+
+================================================================================
+FILE SUMMARIES
+================================================================================
+
+--- src/main.tsx ---
+Exports: (none — entry point)
+Imports (local): ./index.css, ./App.tsx, ./context/ThemeContext
+Description: React 19 entry point. Mounts <ThemeProvider><App /></ThemeProvider>
+  inside React.StrictMode on #root.
+
+--- src/App.tsx ---
+Exports: default App
+Imports (local): ./components/ProtectedRoute, ./components/AdminRoute,
+  ./pages/Landing (lazy), ./pages/Login (lazy), ./pages/Dashboard (lazy),
+  ./pages/ProjectView (lazy), ./pages/AdminDashboard (lazy),
+  ./pages/Careers (lazy), ./pages/Projects (lazy)
+Routes defined:
+  /                    → Landing           (public, lazy)
+  /login               → Login             (public, lazy)
+  /careers             → Careers           (public, lazy)
+  /projects            → Projects          (public, lazy)
+  /dashboard           → Dashboard         (ProtectedRoute — any authenticated role)
+  /dashboard/:projectId → ProjectView      (ProtectedRoute — any authenticated role)
+  /admin               → AdminDashboard    (AdminRoute — MASTER or SUB_MASTER only)
+All lazy-loaded inside a single <Suspense fallback={null}> wrapper.
+
+--- src/config.ts ---
+Exports: API_URL (const)
+Description: Single source of truth for the API base URL.
+  API_URL = import.meta.env.VITE_API_BASE ?? "https://technicloudapi.onrender.com"
+
+--- src/lib/auth.ts ---
+Exports:
+  getToken()    — returns localStorage "token" or null
+  getRole()     — returns localStorage "role" or null
+  setAuth(token, role) — writes both to localStorage
+  clearAuth()   — removes "token" and "role" from localStorage
+  decodeRole(token) — base64-decodes JWT payload, returns .role field or null
+Description: Stateless localStorage-based auth helpers. No React state or context
+  involved — pure utility functions used by route guards and page components.
+
+--- src/context/ThemeContext.tsx ---
+Exports: ThemeProvider (component), useTheme (hook)
+Imports (local): (none)
+Interfaces: ThemeCtx { dark: boolean; toggle: () => void }
+Description: React context for dark/light theme. Persists to localStorage "theme".
+  Applies/removes the "dark" CSS class on <html>. Consumed by Careers page.
+
+--- src/components/ProtectedRoute.tsx ---
+Exports: default ProtectedRoute
+Imports (local): ../lib/auth
+Props: { children: ReactNode; allowedRoles?: string[] }
+Description: Checks for a token in localStorage; redirects to /login if absent.
+  If allowedRoles is provided, also checks getRole() against the list; redirects
+  to /dashboard if the role is not allowed.
+
+--- src/components/AdminRoute.tsx ---
+Exports: default AdminRoute
+Imports (local): ./ProtectedRoute
+Description: Thin wrapper around ProtectedRoute with
+  allowedRoles={["MASTER", "SUB_MASTER"]}. Guards the /admin route.
+
+--- src/pages/Landing.tsx ---
+Exports: default Landing (large single-file marketing page)
+Imports (local): (none)
+Component: Landing
+Description: Full marketing landing page for Technicat Group. Contains:
+  - Sticky navbar with dark-mode toggle, mobile hamburger menu
+  - Hero section with animated headline
+  - Features / services sections (LV Panels, SCADA, cloud monitoring)
+  - Industry verticals section (Healthcare, Data Centers, Industrial, etc.)
+  - Stats section
+  - Contact / CTA section
+  - Footer with LinkedIn, email, address
+  Internal helpers: useScrollReveal hook, Reveal animation wrapper component.
+  No fetch() calls — purely static marketing content.
+  Links to /login, /careers, /projects.
+
+--- src/pages/Login.tsx ---
+Exports: default Login
+Imports (local): ../lib/auth (setAuth, getToken, getRole)
+Component: Login
+Description: Two-step login form ("credentials" → optional "2fa").
+  On mount, if already authenticated, redirects CLIENT → /dashboard,
+  others → /admin.
+Fetch calls:
+  POST ${API_BASE}/api/auth/login
+    body: { email, password }
+    response: { token?, user?, requires_2fa? }
+    on requires_2fa=true → advances to 2FA step
+    on token+user → setAuth(token, role), navigate by role
+  POST ${API_BASE}/api/auth/verify-2fa
+    body: { email, code }
+    response: { token, user }
+    on success → setAuth(token, role), navigate by role
+  (API_BASE defined inline as import.meta.env.VITE_API_BASE ||
+   "https://technicloudapi.onrender.com" — duplicates config.ts)
+Role routing: CLIENT → /dashboard, all others → /admin.
+
+--- src/pages/Dashboard.tsx ---
+Exports: default Dashboard
+Imports (local): ../config (API_URL)
+Component: Dashboard
+Description: Authenticated client portal landing page. Shows a grid of projects
+  assigned to the logged-in user. Falls back to DEMO_PROJECTS if the API is
+  unreachable (shows an amber "Demo mode" banner).
+  Sidebar with nav items (My Projects, Alerts, Settings — only My Projects active),
+  a "Main Website" button (→ /), and a Sign Out button (clears token, → /login).
+Fetch calls:
+  GET ${API_URL}/api/projects
+    headers: Authorization: Bearer <token>
+    response: Project[]
+    on 401 → navigate("/login")
+    on error → fall back to DEMO_PROJECTS
+  Clicking a project card navigates to /dashboard/:projectId.
+
+--- src/pages/ProjectView.tsx ---
+Exports: default ProjectView
+Imports (local): ../lib/auth (getToken), ../config (API_URL)
+Internal components (not exported): MetricCard, DeviceTabBar, WaveformChart
+Component: ProjectView
+Description: SCADA-style real-time telemetry view for a single project.
+  Features:
+  - Dark/light theme toggle (independent of ThemeContext — local state)
+  - Device tab bar (one tab per device_name in telemetry data)
+  - Variable toggle pills to show/hide individual metrics
+  - MetricCard grid — displays latest value with sparkline chart
+  - WaveformChart — Recharts LineChart or data grid view with toggle
+  - Export to Excel button
+  Falls back to DEMO_ROWS if API is unreachable.
+  Polls every 3000 ms using ?since=<lastTimestamp> for incremental updates.
+  MAX_HISTORY = 120 points, SPARK_HISTORY = 20 points, POLL_MS = 3000.
+Fetch calls:
+  GET ${API_URL}/api/telemetry/${projectId}
+    headers: Authorization: Bearer <token>
+    response: { project_name?, rows: TelemetryRow[] } | TelemetryRow[]
+    (initial load — replace=true)
+  GET ${API_URL}/api/telemetry/${projectId}?since=<timestamp>
+    headers: Authorization: Bearer <token>
+    (polling — replace=false, appends new rows)
+  GET ${API_URL}/api/export/${projectId}
+    headers: Authorization: Bearer <token>
+    response: Blob (xlsx)
+    triggers browser download as project_<id>_export.xlsx
+
+--- src/pages/AdminDashboard.tsx ---
+Exports: default AdminDashboard
+Imports (local): ../lib/auth (getToken, getRole, clearAuth), ../config (API_URL)
+Component: AdminDashboard
+Description: Admin panel for MASTER / SUB_MASTER roles. Three-panel sidebar layout:
+  tabs for Fleet (projects), Users, and Licenses.
+  Falls back to DEMO_PROJECTS / DEMO_USERS if API is unreachable.
+  Interfaces defined: Project, User, LicenseResult
+Fetch calls:
+  GET  ${API_URL}/api/admin/projects
+    Parallel with /api/admin/users on initial load.
+  GET  ${API_URL}/api/admin/users
+    Parallel with /api/admin/projects on initial load.
+  POST ${API_URL}/api/admin/projects/${projectId}/assign
+    body: { user_id }  — assigns a project to a user
+  POST ${API_URL}/api/admin/users/set-password
+    body: { user_id, new_password }  — admin password reset
+  GET  ${API_URL}/api/admin/users
+    (re-fetched after tab switch to Users)
+  POST ${API_URL}/api/admin/users
+    body: { email, name, company, role, password }  — create new user
+  POST ${API_URL}/api/admin/generate-license
+    body: { username, project_name, tier, mode, protocols, expires_at }
+    response: LicenseResult { license_key, username, project_name, ... }
+
+--- src/pages/Careers.tsx ---
+Exports: default Careers
+Imports (local): ../context/ThemeContext (useTheme)
+Component: Careers
+Description: Careers page for Technicat Group. Lists open roles
+  (Electrical Engineer, SCADA Developer, Technician, Internship).
+  Clicking a role card pre-fills the application form and scrolls to it.
+  On form submit, opens the user's email client via mailto: with a pre-written
+  application body (no server-side API call). User must attach CV manually.
+  Mailto target: joesfeir007@gmail.com
+  No fetch() calls.
+
+--- src/pages/Projects.tsx ---
+Exports: default Projects
+Imports (local): (none)
+Component: Projects
+Description: Static portfolio page listing 9 completed projects (hardcoded data).
+  Categories: Healthcare, Technology, Manufacturing, Energy, Education, Commercial,
+  Industrial. Types: LV Panel, SCADA, Automation.
+  Filter tabs to show All / by type.
+  Scroll-reveal animations via local IntersectionObserver hook.
+  No fetch() calls — all data is static.
+  CTA footer links to mailto for project inquiries.
+
+================================================================================
+ROUTING & AUTH SUMMARY
+================================================================================
+
+Public routes:   /  /login  /careers  /projects
+Protected routes (any authenticated user):
+  /dashboard            — client project list
+  /dashboard/:projectId — SCADA telemetry view
+Admin-only routes (role must be MASTER or SUB_MASTER):
+  /admin                — fleet + user + license management
+
+Auth mechanism: JWT stored in localStorage["token"]; role in localStorage["role"].
+On login, role determines redirect: CLIENT → /dashboard, others → /admin.
+ProtectedRoute and AdminRoute guard client-side navigation.
+
+================================================================================
+API ENDPOINTS REFERENCED (all under API_URL)
+================================================================================
+
+Auth:
+  POST /api/auth/login
+  POST /api/auth/verify-2fa
+
+Client:
+  GET  /api/projects                         (auth required)
+  GET  /api/telemetry/:projectId             (auth required)
+  GET  /api/telemetry/:projectId?since=<ts>  (auth required, polling)
+  GET  /api/export/:projectId                (auth required, returns xlsx)
+
+Admin:
+  GET  /api/admin/projects
+  GET  /api/admin/users
+  POST /api/admin/projects/:projectId/assign
+  POST /api/admin/users/set-password
+  POST /api/admin/users                      (create user)
+  POST /api/admin/generate-license
+
+================================================================================
+PACKAGE.JSON
+================================================================================
+
+name:    technicat-website
+version: 0.0.0
+type:    module
+
+Scripts:
+  dev     → vite
+  build   → tsc -b && vite build
+  lint    → eslint .
+  preview → vite preview
+
+Dependencies:
+  lucide-react      ^0.577.0   (icon library)
+  react             ^19.2.4
+  react-dom         ^19.2.4
+  react-router-dom  ^7.13.1    (client-side routing)
+  recharts          ^3.8.0     (charts in ProjectView)
+
+Dev dependencies (key):
+  @vitejs/plugin-react  ^6.0.0
+  tailwindcss           ^3.4.19  (available but minimal use — most styling is inline)
+  typescript            ~5.9.3
+  vite                  ^8.0.0
+
+================================================================================
+TSCONFIG (tsconfig.app.json — the effective config)
+================================================================================
+
+target:               ES2023
+lib:                  ES2023, DOM, DOM.Iterable
+module:               ESNext
+moduleResolution:     bundler
+jsx:                  react-jsx
+strict:               true
+noEmit:               true
+noUnusedLocals:       true
+noUnusedParameters:   true
+allowImportingTsExtensions: true
+verbatimModuleSyntax: true
+include:              src/
+
+================================================================================
+VITE CONFIG
+================================================================================
+
+Plugins: @vitejs/plugin-react (default JSX transform)
+No custom aliases, proxy, or build overrides configured.
+
+================================================================================
+DEPLOYMENT
+================================================================================
+
+Platform: Vercel (vercel.json present, .vercel/project.json present)
+API backend: https://technicloudapi.onrender.com (Render.com hosted)
+  Overridable via VITE_API_BASE environment variable.
