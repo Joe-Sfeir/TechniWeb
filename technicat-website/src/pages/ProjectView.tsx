@@ -315,6 +315,7 @@ export default function ProjectView() {
   const [demoMode,    setDemoMode]    = useState(false);
   const [exporting,   setExporting]   = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [fetchError,  setFetchError]  = useState<string | null>(null);
 
   const lastTimestampRef = useRef<string | null>(null);
   const isDark           = theme === "dark";
@@ -409,7 +410,8 @@ export default function ProjectView() {
       try {
         const r = await fetch(`${API_URL}/api/telemetry/${projectId}`, { headers: { Authorization: `Bearer ${token}` } });
         if (handleAuthError(r, navigate)) return;
-        if (!r.ok) throw new Error("fetch failed");
+        if (r.status === 403) { navigate(backTo); return; }
+        if (!r.ok) { setFetchError(`Server error (${r.status}) — contact support.`); return; }
         const data = await r.json() as { project_name?: string; rows: TelemetryRow[] } | TelemetryRow[];
         const rows = Array.isArray(data) ? data : (data.rows ?? []);
         if (!Array.isArray(data) && data.project_name) setProjectName(data.project_name);
@@ -421,7 +423,7 @@ export default function ProjectView() {
         setLoading(false);
       }
     })();
-  }, [projectId, processRows, navigate]);
+  }, [projectId, processRows, navigate, backTo]);
 
   // ── Polling ──
   useEffect(() => {
@@ -578,7 +580,12 @@ export default function ProjectView() {
       {/* ══ Content ══ */}
       <div style={{ flex: 1, overflow: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: "16px" }}>
 
-        {/* Export error */}
+        {/* Fetch / export errors */}
+        {fetchError && (
+          <div style={{ padding: "10px 14px", borderRadius: 8, background: `${CLR.red}15`, border: `1px solid ${CLR.red}40`, color: CLR.red, fontSize: "0.75rem", fontFamily: "'Inter',sans-serif" }}>
+            {fetchError}
+          </div>
+        )}
         {exportError && (
           <div style={{ padding: "10px 14px", borderRadius: 8, background: `${CLR.red}15`, border: `1px solid ${CLR.red}40`, color: CLR.red, fontSize: "0.75rem", fontFamily: "'Inter',sans-serif" }}>
             {exportError}
@@ -603,6 +610,16 @@ export default function ProjectView() {
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {/* Last updated — visible near the data so users know polling is live */}
+        {!demoMode && lastPollMs > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: CLR.green, boxShadow: `0 0 6px ${CLR.green}`, animation: "pulse-dot 2s ease-in-out infinite", flexShrink: 0 }} />
+            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.6rem", letterSpacing: "0.14em", color: CLR.text2(isDark), textTransform: "uppercase" }}>
+              Last updated: {timeStr}
+            </span>
           </div>
         )}
 

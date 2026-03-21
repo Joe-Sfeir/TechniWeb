@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import type { CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Zap, Mail, Lock, ArrowRight, AlertCircle, ShieldCheck, ArrowLeft } from "lucide-react";
-import { setAuth, getToken, getRole } from "../lib/auth";
+import { setAuth, getToken, getRole, isTokenValid } from "../lib/auth";
 import { API_URL } from "../config";
 type Step = "credentials" | "2fa";
 
@@ -18,7 +18,7 @@ export default function Login() {
   useEffect(() => {
     const token = getToken();
     const role  = getRole();
-    if (token && role) {
+    if (token && role && isTokenValid()) {
       navigate(role === "CLIENT" ? "/dashboard" : "/admin", { replace: true });
     }
   }, [navigate]);
