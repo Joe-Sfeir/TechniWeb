@@ -10,9 +10,10 @@ import { API_URL } from "../config";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MAX_HISTORY   = 120;
-const SPARK_HISTORY = 20;
-const POLL_MS       = 3000;
+const MAX_HISTORY      = 120;
+const SPARK_HISTORY    = 20;
+const POLL_MS          = 3000;
+const DEVICE_STALE_MS  = 5 * 60 * 1000;
 
 // Keys in a telemetry row that are NOT variables
 const NON_VAR = new Set(["timestamp", "device_name", "id", "project_id", "created_at", "updated_at"]);
@@ -154,23 +155,31 @@ function MetricCard({ name, value, idx, isDark, sparkData }: {
 
 // ─── DeviceTabBar ─────────────────────────────────────────────────────────────
 
-function DeviceTabBar({ devices, activeTab, onSelect, isLive, isDark }: {
+function DeviceTabBar({ devices, activeTab, onSelect, isLive, isDark, inactiveDevices, showAll, onToggleShowAll }: {
   devices: string[]; activeTab: string; onSelect: (n: string) => void;
   isLive: boolean; isDark: boolean;
+  inactiveDevices: Set<string>; showAll: boolean; onToggleShowAll: () => void;
 }) {
+  const inactiveCount = inactiveDevices.size;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "4px", padding: "0 20px", height: "48px", background: CLR.bgTabBar(isDark), borderBottom: `1px solid ${CLR.border(isDark)}`, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", overflowX: "auto", overflowY: "hidden", flexShrink: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: "4px", padding: "0 12px 0 20px", height: "48px", background: CLR.bgTabBar(isDark), borderBottom: `1px solid ${CLR.border(isDark)}`, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", overflowX: "auto", overflowY: "hidden", flexShrink: 0 }}>
       {devices.map((name, i) => {
-        const isActive = activeTab === name;
-        const accent   = TAB_ACCENTS[i % TAB_ACCENTS.length];
+        const isActive   = activeTab === name;
+        const isInactive = inactiveDevices.has(name);
+        const accent     = TAB_ACCENTS[i % TAB_ACCENTS.length];
         return (
-          <button key={name} onClick={() => onSelect(name)} style={{ padding: "0 16px", height: "32px", border: isActive ? `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.12)"}` : "1px solid transparent", borderRadius: "8px", background: isActive ? (isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.95)") : "transparent", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", whiteSpace: "nowrap", flexShrink: 0, transition: "all 0.15s ease", boxShadow: isActive ? (isDark ? "0 1px 6px rgba(0,0,0,0.4)" : "0 1px 4px rgba(15,23,42,0.12)") : "none" }}>
-            <span style={{ width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0, background: isActive ? (isLive ? accent : CLR.text3(isDark)) : CLR.text3(isDark), boxShadow: isActive && isLive ? `0 0 7px ${accent}` : "none", animation: isActive && isLive ? "pulse-dot 2s ease-in-out infinite" : "none" }} />
+          <button key={name} onClick={() => onSelect(name)} style={{ padding: "0 16px", height: "32px", border: isActive ? `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.12)"}` : "1px solid transparent", borderRadius: "8px", background: isActive ? (isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.95)") : "transparent", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", whiteSpace: "nowrap", flexShrink: 0, transition: "all 0.15s ease", boxShadow: isActive ? (isDark ? "0 1px 6px rgba(0,0,0,0.4)" : "0 1px 4px rgba(15,23,42,0.12)") : "none", opacity: isInactive ? 0.4 : 1 }}>
+            <span style={{ width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0, background: isActive ? (isLive && !isInactive ? accent : CLR.text3(isDark)) : CLR.text3(isDark), boxShadow: isActive && isLive && !isInactive ? `0 0 7px ${accent}` : "none", animation: isActive && isLive && !isInactive ? "pulse-dot 2s ease-in-out infinite" : "none" }} />
             <span style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: isActive ? 700 : 500, fontSize: "0.83rem", letterSpacing: "0.04em", color: isActive ? CLR.text1(isDark) : CLR.text2(isDark) }}>{name}</span>
             <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.54rem", letterSpacing: "0.08em", color: isActive ? accent : CLR.text3(isDark), padding: "1px 6px", borderRadius: "20px", border: `1px solid ${isActive ? accent + "40" : CLR.border(isDark)}`, background: isActive ? accent + "10" : "transparent" }}>S{i + 1}</span>
           </button>
         );
       })}
+      {inactiveCount > 0 && (
+        <button onClick={onToggleShowAll} style={{ marginLeft: "auto", flexShrink: 0, padding: "0 12px", height: "26px", borderRadius: "6px", border: `1px solid ${showAll ? CLR.amber + "66" : CLR.border(isDark)}`, background: showAll ? CLR.amber + "18" : "transparent", color: showAll ? CLR.amber : CLR.text3(isDark), fontFamily: "'Share Tech Mono',monospace", fontSize: "0.56rem", letterSpacing: "0.1em", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s" }}>
+          {showAll ? "HIDE INACTIVE" : `SHOW ALL (${inactiveCount} INACTIVE)`}
+        </button>
+      )}
     </div>
   );
 }
@@ -336,9 +345,11 @@ export default function ProjectView() {
   const [history,     setHistory]     = useState<Record<string, ChartPoint[]>>({});
   const [sparkHistory,setSparkHistory]= useState<Record<string, Record<string, number[]>>>({});
   const [projectName, setProjectName] = useState(`Project #${projectId}`);
-  const [lastPollMs,  setLastPollMs]  = useState(0);
-  const [loading,     setLoading]     = useState(true);
-  const [demoMode,    setDemoMode]    = useState(false);
+  const [lastPollMs,     setLastPollMs]     = useState(0);
+  const [deviceLastSeen, setDeviceLastSeen] = useState<Record<string, number>>({});
+  const [showAllDevices, setShowAllDevices] = useState(false);
+  const [loading,        setLoading]        = useState(true);
+  const [demoMode,       setDemoMode]       = useState(false);
   const [exporting,   setExporting]   = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [fetchError,  setFetchError]  = useState<string | null>(null);
@@ -426,6 +437,16 @@ export default function ProjectView() {
     const newest = rows.reduce((best, r) => r.timestamp > best ? r.timestamp : best, rows[0].timestamp);
     lastTimestampRef.current = newest;
     setLastPollMs(Date.now());
+
+    // Track per-device last-seen (from row timestamps, not wall clock)
+    const perDeviceNewest: Record<string, number> = {};
+    rows.forEach((row) => {
+      const ms = new Date(row.timestamp).getTime();
+      if (!perDeviceNewest[row.device_name] || ms > perDeviceNewest[row.device_name]) {
+        perDeviceNewest[row.device_name] = ms;
+      }
+    });
+    setDeviceLastSeen((prev) => ({ ...prev, ...perDeviceNewest }));
   }, []);
 
   // ── Initial fetch ──
@@ -507,6 +528,29 @@ export default function ProjectView() {
   const tabAccent      = TAB_ACCENTS[devices.indexOf(activeTab) % TAB_ACCENTS.length] ?? CLR.blue;
   const timeStr        = lastPollMs > 0 ? new Date(lastPollMs).toLocaleTimeString("en-GB", { hour12: false }) : "--:--:--";
   const isLive         = !demoMode;
+
+  const inactiveDeviceSet = useMemo(() => {
+    const now = Date.now();
+    return new Set(devices.filter((d) => deviceLastSeen[d] !== undefined && now - deviceLastSeen[d] > DEVICE_STALE_MS));
+  }, [devices, deviceLastSeen, lastPollMs]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const visibleDevices = useMemo(() => {
+    if (showAllDevices) return devices;
+    const active = devices.filter((d) => !inactiveDeviceSet.has(d));
+    return active.length > 0 ? active : devices;
+  }, [devices, inactiveDeviceSet, showAllDevices]);
+
+  function handleToggleShowAll() {
+    setShowAllDevices((prev) => {
+      const next = !prev;
+      // If hiding inactive and current tab is stale, switch to first visible active device
+      if (!next && inactiveDeviceSet.has(activeTab)) {
+        const firstActive = devices.find((d) => !inactiveDeviceSet.has(d));
+        if (firstActive) setActiveTab(firstActive);
+      }
+      return next;
+    });
+  }
 
   const ctrlBtn = (accent?: string): React.CSSProperties => ({
     display: "flex", alignItems: "center", gap: "6px",
@@ -600,7 +644,7 @@ export default function ProjectView() {
 
       {/* ══ Device Tab Bar ══ */}
       {devices.length > 0 && (
-        <DeviceTabBar devices={devices} activeTab={activeTab} onSelect={setActiveTab} isLive={isLive} isDark={isDark} />
+        <DeviceTabBar devices={visibleDevices} activeTab={activeTab} onSelect={setActiveTab} isLive={isLive} isDark={isDark} inactiveDevices={inactiveDeviceSet} showAll={showAllDevices} onToggleShowAll={handleToggleShowAll} />
       )}
 
       {/* ══ Content ══ */}
