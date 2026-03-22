@@ -640,13 +640,17 @@ export default function ProjectView() {
         )}
 
         {/* Last updated — visible near the data so users know polling is live */}
-        {!demoMode && lastPollMs > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: CLR.green, boxShadow: `0 0 6px ${CLR.green}`, animation: "pulse-dot 2s ease-in-out infinite", flexShrink: 0 }} />
-            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.6rem", letterSpacing: "0.14em", color: CLR.text2(isDark), textTransform: "uppercase" }}>
-              Last updated: {timeStr}
-            </span>
-          </div>
+        {!demoMode && lastPollMs > 0 && (() => {
+          const isStale = Date.now() - lastPollMs > 30_000;
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: isStale ? CLR.amber : CLR.green, boxShadow: isStale ? "none" : `0 0 6px ${CLR.green}`, animation: isStale ? "none" : "pulse-dot 2s ease-in-out infinite", flexShrink: 0 }} />
+              <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.6rem", letterSpacing: "0.14em", color: isStale ? CLR.amber : CLR.text2(isDark), textTransform: "uppercase" }}>
+                {isStale ? `Data may be stale — last updated: ${timeStr}` : `Last updated: ${timeStr}`}
+              </span>
+            </div>
+          );
+        })()}
         )}
 
         {/* Metric cards — only visible vars */}

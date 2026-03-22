@@ -155,6 +155,11 @@ const ONLINE_METER_OPTIONS = [
   { id: "all",               label: "All"               },
 ];
 
+const ONLINE_FEATURE_OPTIONS = [
+  { id: "email_alerts", label: "Email Alerts" },
+  { id: "diagnostics",  label: "Diagnostics"  },
+];
+
 const ONLINE_STATUS_COLOR: Record<string, string> = {
   ONLINE:  CLR.green,
   OFFLINE: CLR.muted2,
@@ -984,6 +989,22 @@ function OnlineProjectsTab() {
   // activate toggle
   const [toggleLoading, setToggleLoading] = useState<Record<string, boolean>>({});
 
+  // hide / show
+  const [hiddenProjects, setHiddenProjects] = useState<Set<string>>(() => {
+    try { return new Set<string>(JSON.parse(localStorage.getItem("hidden_online_projects") ?? "[]")); }
+    catch { return new Set<string>(); }
+  });
+  const [showHiddenProjects, setShowHiddenProjects] = useState(false);
+
+  function toggleHideProject(id: string) {
+    setHiddenProjects((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      localStorage.setItem("hidden_online_projects", JSON.stringify([...next]));
+      return next;
+    });
+  }
+
   // delete
   const [deleteId,      setDeleteId]      = useState<string | null>(null);
   const [deleteInput,   setDeleteInput]   = useState("");
@@ -1329,6 +1350,20 @@ function OnlineProjectsTab() {
           </div>
 
           <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Features</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {ONLINE_FEATURE_OPTIONS.map((opt) => (
+                <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                    {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
+                  </div>
+                  <span style={{ fontSize: 13, color: meters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Protocols</label>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               {(["RTU", "TCP", "All"] as const).map((p) => (
@@ -1361,6 +1396,11 @@ function OnlineProjectsTab() {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
           <h3 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 16, color: CLR.text, letterSpacing: "-0.02em", margin: 0 }}>Projects</h3>
           <span style={{ fontSize: 11, fontWeight: 700, color: CLR.accent, background: CLR.accentDim, border: "1px solid #bfdbfe", padding: "1px 8px", borderRadius: 4 }}>{projects.length}</span>
+          {hiddenProjects.size > 0 && (
+            <button type="button" onClick={() => setShowHiddenProjects((v) => !v)} style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 6, background: showHiddenProjects ? CLR.amberBg : "#f8fafc", border: `1px solid ${showHiddenProjects ? CLR.amberBdr : CLR.border}`, color: showHiddenProjects ? CLR.amber : CLR.muted, cursor: "pointer" }}>
+              {showHiddenProjects ? "Hide hidden" : `Show hidden (${hiddenProjects.size})`}
+            </button>
+          )}
         </div>
 
         {loading ? (
@@ -1371,7 +1411,7 @@ function OnlineProjectsTab() {
           <div style={{ ...card({ padding: 28, textAlign: "center", color: CLR.muted, fontSize: 13 }) }}>No online projects yet. Create one above.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-            {projects.map((p) => (
+            {projects.filter((p) => showHiddenProjects || !hiddenProjects.has(p.id)).map((p) => (
               <Fragment key={p.id}>
                 {/* Main row */}
                 <div style={{ ...card({ padding: 0, overflow: "hidden", marginBottom: 8, borderRadius: 10 }) }}>
@@ -1399,6 +1439,9 @@ function OnlineProjectsTab() {
                     <span style={{ fontSize: 12, color: CLR.muted }}>{p.expires_at ?? "—"}</span>
                     {/* Actions */}
                     <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "flex-end" }}>
+                      <button onClick={() => toggleHideProject(p.id)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: hiddenProjects.has(p.id) ? CLR.accentDim : "#f8fafc", border: `1px solid ${hiddenProjects.has(p.id) ? "#bfdbfe" : CLR.border}`, color: hiddenProjects.has(p.id) ? CLR.accent : CLR.muted, cursor: "pointer" }}>
+                        {hiddenProjects.has(p.id) ? "Show" : "Hide"}
+                      </button>
                       <button onClick={() => openEdit(p)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, cursor: "pointer" }}>Edit</button>
                       <button onClick={() => { setRenewId(p.id); setRenewDays(365); setRenewError(null); }} style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: CLR.amberBg, border: `1px solid ${CLR.amberBdr}`, color: CLR.amber, cursor: "pointer" }}>Renew</button>
                       <button
@@ -1448,6 +1491,19 @@ function OnlineProjectsTab() {
                         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                           {ONLINE_METER_OPTIONS.map((opt) => (
+                            <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                              <div onClick={() => toggleEditMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${editMeters.includes(opt.id) ? CLR.accent : CLR.border}`, background: editMeters.includes(opt.id) ? CLR.accentDim : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                                {editMeters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
+                              </div>
+                              <span style={{ fontSize: 13, color: editMeters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 14 }}>
+                        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Features</label>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                          {ONLINE_FEATURE_OPTIONS.map((opt) => (
                             <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                               <div onClick={() => toggleEditMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${editMeters.includes(opt.id) ? CLR.accent : CLR.border}`, background: editMeters.includes(opt.id) ? CLR.accentDim : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                                 {editMeters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
@@ -1598,7 +1654,10 @@ function LicenseTab() {
   const [licenseHistory, setLicenseHistory] = useState<LicenseRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError,   setHistoryError]   = useState<string | null>(null);
-  const [hiddenLicenses, setHiddenLicenses] = useState<Set<string>>(new Set());
+  const [hiddenLicenses, setHiddenLicenses] = useState<Set<string>>(() => {
+    try { return new Set<string>(JSON.parse(localStorage.getItem("hidden_offline_licenses") ?? "[]")); }
+    catch { return new Set<string>(); }
+  });
   const [showHidden,     setShowHidden]     = useState(false);
 
   useEffect(() => {
@@ -1833,7 +1892,7 @@ function LicenseTab() {
                       <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9`, whiteSpace: "nowrap" as const }}>{r.expires_at}</td>
                       <td style={{ padding: "11px 14px", color: CLR.muted2, fontSize: 12, borderBottom: `1px solid #f1f5f9`, whiteSpace: "nowrap" as const }}>{r.created_at}</td>
                       <td style={{ padding: "11px 14px", borderBottom: `1px solid #f1f5f9` }}>
-                        <button type="button" onClick={() => setHiddenLicenses((prev) => { const next = new Set(prev); if (next.has(String(r.id))) next.delete(String(r.id)); else next.add(String(r.id)); return next; })}
+                        <button type="button" onClick={() => setHiddenLicenses((prev) => { const next = new Set(prev); if (next.has(String(r.id))) next.delete(String(r.id)); else next.add(String(r.id)); localStorage.setItem("hidden_offline_licenses", JSON.stringify([...next])); return next; })}
                           style={{ padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: "pointer", background: hiddenLicenses.has(String(r.id)) ? CLR.accentDim : "#f8fafc", border: `1px solid ${hiddenLicenses.has(String(r.id)) ? "#bfdbfe" : CLR.border}`, color: hiddenLicenses.has(String(r.id)) ? CLR.accent : CLR.muted, whiteSpace: "nowrap" }}>
                           {hiddenLicenses.has(String(r.id)) ? "Show" : "Hide"}
                         </button>
