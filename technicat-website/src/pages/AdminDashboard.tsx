@@ -1588,7 +1588,6 @@ function LicenseTab() {
   const navigate = useNavigate();
   const [username,    setUsername]    = useState("");
   const [projectName, setProjectName] = useState("");
-  const [tier,        setTier]        = useState(1);
   const [protocols,   setProtocols]   = useState<LicenseProtocol>("All Protocols");
   const [ttl,         setTtl]         = useState(365);
   const [meters,      setMeters]      = useState<string[]>(["schneider_pm2220"]);
