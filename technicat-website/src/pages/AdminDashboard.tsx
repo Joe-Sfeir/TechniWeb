@@ -59,6 +59,9 @@ interface Project {
   status: "online" | "offline" | "warning";
   device_count: number;
   last_seen: string;
+  project_key?: string;
+  activation_count?: number;
+  node_count?: number;
 }
 
 interface User {
@@ -93,6 +96,31 @@ interface LicenseRecord {
   created_at: string;
 }
 
+interface OnlineProject {
+  id: string;
+  name: string;
+  tier: number;
+  project_key: string;
+  max_activations: number;
+  activation_count: number;
+  node_count: number;
+  duration_days: number;
+  expires_at: string;
+  is_active: boolean;
+  allowed_meters: string[];
+  protocols: string;
+  notes?: string;
+  status: "ONLINE" | "OFFLINE" | "NEVER";
+  clients: { id: number; email: string }[];
+}
+
+interface OnlineActivation {
+  machine_id: string;
+  node_name: string;
+  last_seen: string;
+  is_active: boolean;
+}
+
 // ─── Demo Data ────────────────────────────────────────────────────────────────
 const DEMO_PROJECTS: Project[] = [
   { id: "p1", name: "HVAC Complex A",    clients: [{ id: 1, email: "ali@alnoor.ae" }],   tier: 2, status: "online",  device_count: 6,  last_seen: "just now"  },
@@ -117,6 +145,27 @@ const METER_OPTIONS = [
   { id: "email_alerts",     label: "Email Alerts"      },
   { id: "diagnostics",      label: "Diagnostics"       },
 ];
+
+const ONLINE_METER_OPTIONS = [
+  { id: "schneider_pm2220",  label: "Schneider PM2220"  },
+  { id: "socomec_diris_a40", label: "Socomec Diris A40" },
+  { id: "lovato_dmg",        label: "Lovato DMG"        },
+  { id: "custom",            label: "Custom"            },
+  { id: "simulation",        label: "Simulation"        },
+  { id: "all",               label: "All"               },
+];
+
+const ONLINE_STATUS_COLOR: Record<string, string> = {
+  ONLINE:  CLR.green,
+  OFFLINE: CLR.muted2,
+  NEVER:   CLR.muted2,
+};
+
+const ONLINE_STATUS_BG: Record<string, string> = {
+  ONLINE:  CLR.greenBg,
+  OFFLINE: "#f8fafc",
+  NEVER:   "#f8fafc",
+};
 
 const STATUS_DOT: Record<string, string> = {
   online:  CLR.green,
@@ -284,7 +333,7 @@ function FleetTab() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
               <thead>
                 <tr>
-                  {["Project", "Clients", "Tier", "Status", "Devices", "Last Seen", "", "Add Client", ""].map((h) => (
+                  {["Project", "Clients", "Tier", "Status", "Devices", "Nodes", "Activations", "Last Seen", "", "Add Client", ""].map((h) => (
                     <th key={h} style={thStyle}>{h}</th>
                   ))}
                 </tr>
@@ -330,6 +379,8 @@ function FleetTab() {
                       </span>
                     </td>
                     <td style={{ ...tdStyle, color: CLR.muted }}>{p.device_count}</td>
+                    <td style={{ ...tdStyle, color: CLR.muted }}>{p.project_key ? (p.node_count ?? 0) : <span style={{ color: CLR.muted2 }}>—</span>}</td>
+                    <td style={{ ...tdStyle, color: CLR.muted }}>{p.project_key ? (p.activation_count ?? 0) : <span style={{ color: CLR.muted2 }}>—</span>}</td>
                     <td style={{ ...tdStyle, color: CLR.muted }}>{p.last_seen}</td>
                     <td style={tdStyle}>
                       <button
@@ -387,7 +438,7 @@ function FleetTab() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
                 <thead>
                   <tr>
-                    {["Project", "Tier", "Status", "Devices", "Last Seen", "", "Assign To", ""].map((h) => (
+                    {["Project", "Tier", "Status", "Devices", "Nodes", "Activations", "Last Seen", "", "Assign To", ""].map((h) => (
                       <th key={h} style={{ ...thStyle, background: "#fffbeb" }}>{h}</th>
                     ))}
                   </tr>
@@ -408,6 +459,8 @@ function FleetTab() {
                         </span>
                       </td>
                       <td style={{ ...tdStyle, color: CLR.muted }}>{p.device_count}</td>
+                      <td style={{ ...tdStyle, color: CLR.muted }}>{p.project_key ? (p.node_count ?? 0) : <span style={{ color: CLR.muted2 }}>—</span>}</td>
+                      <td style={{ ...tdStyle, color: CLR.muted }}>{p.project_key ? (p.activation_count ?? 0) : <span style={{ color: CLR.muted2 }}>—</span>}</td>
                       <td style={{ ...tdStyle, color: CLR.muted }}>{p.last_seen}</td>
                       <td style={tdStyle}>
                         <button
@@ -882,6 +935,652 @@ function CreateUserTab() {
   );
 }
 
+// ─── Online Projects Tab ──────────────────────────────────────────────────────
+function OnlineProjectsTab() {
+  const navigate = useNavigate();
+
+  // list state
+  const [projects,     setProjects]     = useState<OnlineProject[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [fetchError,   setFetchError]   = useState<string | null>(null);
+
+  // create form
+  const [name,         setName]         = useState("");
+  const [tier,         setTier]         = useState(1);
+  const [maxAct,       setMaxAct]       = useState(1);
+  const [durDays,      setDurDays]      = useState(365);
+  const [meters,       setMeters]       = useState<string[]>([]);
+  const [protocols,    setProtocols]    = useState("All");
+  const [notes,        setNotes]        = useState("");
+  const [creating,     setCreating]     = useState(false);
+  const [createError,  setCreateError]  = useState<string | null>(null);
+  const [newKey,       setNewKey]       = useState<string | null>(null);
+  const [copiedKey,    setCopiedKey]    = useState(false);
+
+  // expand / activations
+  const [expanded,           setExpanded]           = useState<string | null>(null);
+  const [activations,        setActivations]        = useState<Record<string, OnlineActivation[]>>({});
+  const [activationsLoading, setActivationsLoading] = useState<Record<string, boolean>>({});
+  const [copiedProjectKey,   setCopiedProjectKey]   = useState<string | null>(null);
+
+  // edit
+  const [editId,       setEditId]       = useState<string | null>(null);
+  const [editName,     setEditName]     = useState("");
+  const [editTier,     setEditTier]     = useState(1);
+  const [editMaxAct,   setEditMaxAct]   = useState(1);
+  const [editDurDays,  setEditDurDays]  = useState(365);
+  const [editMeters,   setEditMeters]   = useState<string[]>([]);
+  const [editProtocols,setEditProtocols]= useState("All");
+  const [editNotes,    setEditNotes]    = useState("");
+  const [editing,      setEditing]      = useState(false);
+  const [editError,    setEditError]    = useState<string | null>(null);
+
+  // renew
+  const [renewId,      setRenewId]      = useState<string | null>(null);
+  const [renewDays,    setRenewDays]    = useState(365);
+  const [renewing,     setRenewing]     = useState(false);
+  const [renewError,   setRenewError]   = useState<string | null>(null);
+
+  // activate toggle
+  const [toggleLoading, setToggleLoading] = useState<Record<string, boolean>>({});
+
+  // delete
+  const [deleteId,      setDeleteId]      = useState<string | null>(null);
+  const [deleteInput,   setDeleteInput]   = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError,   setDeleteError]   = useState<string | null>(null);
+
+  // node toggle
+  const [nodeToggleLoading, setNodeToggleLoading] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    const token = getToken();
+    fetch(`${API_BASE}/api/admin/online-projects`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => { if (handleAuthError(r, navigate)) throw new Error("auth"); return r.json(); })
+      .then((d) => setProjects(Array.isArray(d) ? d : d.projects ?? []))
+      .catch((err) => { if (err?.message !== "auth") setFetchError("Could not load online projects."); })
+      .finally(() => setLoading(false));
+  }, [navigate]);
+
+  function toggleMeter(id: string) {
+    setMeters((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
+  }
+  function toggleEditMeter(id: string) {
+    setEditMeters((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
+  }
+
+  async function createProject(e: React.FormEvent) {
+    e.preventDefault();
+    setCreateError(null);
+    setCreating(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/online-projects`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name, tier, max_activations: maxAct, duration_days: durDays, allowed_meters: meters, protocols, notes: notes || undefined }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Failed to create project");
+      setNewKey((data.project_key as string) ?? "");
+      setProjects((prev) => [data as unknown as OnlineProject, ...prev]);
+      setName(""); setTier(1); setMaxAct(1); setDurDays(365); setMeters([]); setProtocols("All"); setNotes("");
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : "Failed to create project");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function expandProject(id: string) {
+    if (expanded === id) { setExpanded(null); return; }
+    setExpanded(id);
+    if (activations[id]) return;
+    setActivationsLoading((prev) => ({ ...prev, [id]: true }));
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/online-projects/${id}/activations`, { headers: { Authorization: `Bearer ${token}` } });
+      if (handleAuthError(res, navigate)) return;
+      const d = await res.json().catch(() => []);
+      setActivations((prev) => ({ ...prev, [id]: Array.isArray(d) ? d : d.activations ?? [] }));
+    } catch {
+      setActivations((prev) => ({ ...prev, [id]: [] }));
+    } finally {
+      setActivationsLoading((prev) => ({ ...prev, [id]: false }));
+    }
+  }
+
+  function copyProjectKey(key: string, id: string) {
+    navigator.clipboard.writeText(key).then(() => {
+      setCopiedProjectKey(id);
+      setTimeout(() => setCopiedProjectKey(null), 2000);
+    });
+  }
+
+  function openEdit(p: OnlineProject) {
+    setEditId(p.id);
+    setEditName(p.name);
+    setEditTier(p.tier);
+    setEditMaxAct(p.max_activations);
+    setEditDurDays(p.duration_days);
+    setEditMeters(p.allowed_meters ?? []);
+    setEditProtocols(p.protocols ?? "All");
+    setEditNotes(p.notes ?? "");
+    setEditError(null);
+  }
+
+  async function saveEdit(id: string) {
+    setEditError(null);
+    setEditing(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/online-projects/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: editName, tier: editTier, max_activations: editMaxAct, duration_days: editDurDays, allowed_meters: editMeters, protocols: editProtocols, notes: editNotes || undefined }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Failed to save changes");
+      setProjects((prev) => prev.map((p) => p.id === id ? { ...p, name: editName, tier: editTier, max_activations: editMaxAct, duration_days: editDurDays, allowed_meters: editMeters, protocols: editProtocols, notes: editNotes } : p));
+      setEditId(null);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to save changes");
+    } finally {
+      setEditing(false);
+    }
+  }
+
+  async function renewProject() {
+    if (!renewId) return;
+    setRenewError(null);
+    setRenewing(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/online-projects/${renewId}/renew`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ duration_days: renewDays }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Failed to renew project");
+      if (data.expires_at) {
+        setProjects((prev) => prev.map((p) => p.id === renewId ? { ...p, expires_at: data.expires_at as string } : p));
+      }
+      setRenewId(null);
+    } catch (err) {
+      setRenewError(err instanceof Error ? err.message : "Failed to renew project");
+    } finally {
+      setRenewing(false);
+    }
+  }
+
+  async function toggleActive(p: OnlineProject) {
+    setToggleLoading((prev) => ({ ...prev, [p.id]: true }));
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/online-projects/${p.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ is_active: !p.is_active }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      if (!res.ok) throw new Error("Request failed");
+      setProjects((prev) => prev.map((x) => x.id === p.id ? { ...x, is_active: !p.is_active } : x));
+    } catch {
+      // silently ignore — button will re-enable
+    } finally {
+      setToggleLoading((prev) => ({ ...prev, [p.id]: false }));
+    }
+  }
+
+  async function deleteProject() {
+    if (!deleteId) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/online-projects/${deleteId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ confirm: true }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as Record<string, unknown>;
+        throw new Error((d.error as string) ?? "Failed to delete project");
+      }
+      setProjects((prev) => prev.filter((p) => p.id !== deleteId));
+      setDeleteId(null);
+      setDeleteInput("");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete project");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  async function toggleNode(projectId: string, machineId: string, current: boolean) {
+    const key = `${projectId}-${machineId}`;
+    setNodeToggleLoading((prev) => ({ ...prev, [key]: true }));
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/online-projects/${projectId}/activations/${machineId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ is_active: !current }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      if (!res.ok) throw new Error("Request failed");
+      setActivations((prev) => ({
+        ...prev,
+        [projectId]: (prev[projectId] ?? []).map((a) => a.machine_id === machineId ? { ...a, is_active: !current } : a),
+      }));
+    } catch {
+      // silently ignore
+    } finally {
+      setNodeToggleLoading((prev) => ({ ...prev, [key]: false }));
+    }
+  }
+
+  const inputStyle: CSSProperties = {
+    width: "100%", padding: "10px 12px", borderRadius: 8,
+    border: `1px solid ${CLR.border}`, background: "#f8fafc",
+    color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
+    fontFamily: "'Inter',sans-serif", transition: "border-color 0.2s, box-shadow 0.2s",
+  };
+
+  const toggleBtn = (active: boolean, color?: string): CSSProperties => ({
+    padding: "7px 18px", borderRadius: 7, fontSize: 13,
+    fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
+    background: active ? (color ? `${color}14` : CLR.accentDim) : "#f8fafc",
+    border: `1px solid ${active ? (color ? `${color}40` : "#bfdbfe") : CLR.border}`,
+    color: active ? (color ?? CLR.accent) : CLR.muted,
+  });
+
+  const thStyle: CSSProperties = { textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", borderBottom: `1px solid ${CLR.border}`, background: "#f8fafc" };
+  const tdStyle: CSSProperties = { padding: "12px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9` };
+
+  const deleteProject_ = projects.find((p) => p.id === deleteId);
+  const renewProject_  = projects.find((p) => p.id === renewId);
+
+  return (
+    <div className="admin-fade">
+      {/* ── Renew Modal ─────────────────────────────────────────────────────── */}
+      {renewId && renewProject_ && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)" }}>
+          <div style={{ ...card({ padding: 32, maxWidth: 400, width: "90%", position: "relative", borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }) }}>
+            <button onClick={() => { setRenewId(null); setRenewError(null); }} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", color: CLR.muted, cursor: "pointer" }}><X size={18} /></button>
+            <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 18, color: CLR.text, marginBottom: 4 }}>Renew Project</div>
+            <div style={{ fontSize: 13, color: CLR.muted, marginBottom: 20 }}>{renewProject_.name}</div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Additional Days</label>
+            <input type="number" min={1} value={renewDays} onChange={(e) => setRenewDays(Number(e.target.value))} style={{ ...inputStyle, marginBottom: 16 }}
+              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+              onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+            {renewError && <div style={{ padding: "9px 12px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13, marginBottom: 14 }}>{renewError}</div>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={renewProject} disabled={renewing} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 8, background: CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 14, cursor: renewing ? "not-allowed" : "pointer", opacity: renewing ? 0.65 : 1 }}>
+                {renewing ? <Spinner /> : <><RefreshCw size={14} /> Renew</>}
+              </button>
+              <button onClick={() => { setRenewId(null); setRenewError(null); }} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Modal ─────────────────────────────────────────────────────── */}
+      {deleteId && deleteProject_ && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)" }}>
+          <div style={{ ...card({ padding: 32, maxWidth: 440, width: "90%", position: "relative", borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }) }}>
+            <button onClick={() => { setDeleteId(null); setDeleteInput(""); setDeleteError(null); }} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", color: CLR.muted, cursor: "pointer" }}><X size={18} /></button>
+            <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 18, color: CLR.danger, marginBottom: 4 }}>Delete Project</div>
+            <div style={{ fontSize: 13, color: CLR.muted, marginBottom: 6 }}>This action cannot be undone. All activations will be invalidated.</div>
+            <div style={{ fontSize: 13, color: CLR.text, marginBottom: 16 }}>Type <strong>{deleteProject_.name}</strong> to confirm:</div>
+            <input value={deleteInput} onChange={(e) => setDeleteInput(e.target.value)} placeholder={deleteProject_.name} style={{ ...inputStyle, marginBottom: 16 }}
+              onFocus={(e) => { e.target.style.borderColor = "#fca5a5"; e.target.style.boxShadow = "0 0 0 3px rgba(220,38,38,0.1)"; }}
+              onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+            {deleteError && <div style={{ padding: "9px 12px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13, marginBottom: 14 }}>{deleteError}</div>}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={deleteProject}
+                disabled={deleteLoading || deleteInput !== deleteProject_.name}
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 8, background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, color: CLR.danger, fontWeight: 700, fontSize: 14, cursor: (deleteLoading || deleteInput !== deleteProject_.name) ? "not-allowed" : "pointer", opacity: (deleteLoading || deleteInput !== deleteProject_.name) ? 0.55 : 1 }}
+              >
+                {deleteLoading ? <Spinner /> : <><X size={14} /> Delete</>}
+              </button>
+              <button onClick={() => { setDeleteId(null); setDeleteInput(""); setDeleteError(null); }} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SectionHeader title="Online Projects" sub="Create and manage cloud-connected project keys" />
+
+      {/* ── Create Project Form ───────────────────────────────────────────────── */}
+      <div style={{ maxWidth: 500, marginBottom: 40 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: CLR.text, marginBottom: 16, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>Create Project</div>
+
+        {/* New key success box */}
+        {newKey && (
+          <div style={{ padding: 20, background: CLR.greenBg, border: `2px solid ${CLR.greenBdr}`, borderRadius: 12, marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, fontSize: 15, color: CLR.green, marginBottom: 4 }}>
+              <Check size={16} /> Project Created — Save this key now!
+            </div>
+            <div style={{ fontSize: 12, color: CLR.muted, marginBottom: 12 }}>This key will not be shown again.</div>
+            <div style={{ background: "#fff", border: `1px solid ${CLR.greenBdr}`, borderRadius: 8, padding: "12px 14px", fontFamily: "'Share Tech Mono',monospace", fontSize: 13, color: CLR.accent, wordBreak: "break-all", lineHeight: 1.6, marginBottom: 12 }}>{newKey}</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={() => { navigator.clipboard.writeText(newKey).then(() => { setCopiedKey(true); setTimeout(() => setCopiedKey(false), 2000); }); }}
+                style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "9px", borderRadius: 8, background: copiedKey ? CLR.greenBg : CLR.accentDim, border: `1px solid ${copiedKey ? CLR.greenBdr : "#bfdbfe"}`, color: copiedKey ? CLR.green : CLR.accent, fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+              >
+                {copiedKey ? <><Check size={13} /> Copied!</> : <><Copy size={13} /> Copy to Clipboard</>}
+              </button>
+              <button onClick={() => setNewKey(null)} style={{ padding: "9px 16px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Dismiss</button>
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={createProject} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Project Name</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} required placeholder="HVAC Complex A" style={inputStyle}
+              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+              onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Tier</label>
+            <div style={{ display: "flex", gap: 8 }}>
+              {[1, 2, 3].map((t) => (
+                <button key={t} type="button" onClick={() => setTier(t)} style={toggleBtn(tier === t, TIER_COLOR[t])}>Tier {t}</button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Max Activations</label>
+              <input type="number" min={1} value={maxAct} onChange={(e) => setMaxAct(Number(e.target.value))} style={inputStyle}
+                onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+                onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Duration (days)</label>
+              <input type="number" min={1} value={durDays} onChange={(e) => setDurDays(Number(e.target.value))} required style={inputStyle}
+                onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+                onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {ONLINE_METER_OPTIONS.map((opt) => (
+                <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                    {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
+                  </div>
+                  <span style={{ fontSize: 13, color: meters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Protocols</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {(["RTU", "TCP", "All"] as const).map((p) => (
+                <button key={p} type="button" onClick={() => setProtocols(p)} style={toggleBtn(protocols === p)}>{p}</button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Notes <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span></label>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} placeholder="Internal notes…" style={{ ...inputStyle, resize: "vertical" as const }}
+              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+              onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+          </div>
+
+          {createError && <div style={{ padding: "10px 14px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{createError}</div>}
+
+          <button type="submit" disabled={creating}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", borderRadius: 8, background: creating ? "rgba(37,99,235,0.55)" : CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 15, cursor: creating ? "not-allowed" : "pointer", opacity: creating ? 0.7 : 1, boxShadow: "0 4px 16px rgba(37,99,235,0.25)", transition: "all 0.2s" }}
+            onMouseEnter={(e) => { if (!creating) e.currentTarget.style.background = "#1d4ed8"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = creating ? "rgba(37,99,235,0.55)" : CLR.accent; }}
+          >
+            {creating ? <Spinner /> : <><Zap size={14} /> Create Project</>}
+          </button>
+        </form>
+      </div>
+
+      {/* ── Project Management List ───────────────────────────────────────────── */}
+      <div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+          <h3 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 16, color: CLR.text, letterSpacing: "-0.02em", margin: 0 }}>Projects</h3>
+          <span style={{ fontSize: 11, fontWeight: 700, color: CLR.accent, background: CLR.accentDim, border: "1px solid #bfdbfe", padding: "1px 8px", borderRadius: 4 }}>{projects.length}</span>
+        </div>
+
+        {loading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: 32 }}><Spinner /></div>
+        ) : fetchError ? (
+          <div style={{ padding: "10px 14px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{fetchError}</div>
+        ) : projects.length === 0 ? (
+          <div style={{ ...card({ padding: 28, textAlign: "center", color: CLR.muted, fontSize: 13 }) }}>No online projects yet. Create one above.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            {projects.map((p) => (
+              <Fragment key={p.id}>
+                {/* Main row */}
+                <div style={{ ...card({ padding: 0, overflow: "hidden", marginBottom: 8, borderRadius: 10 }) }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "minmax(160px,2fr) 80px 120px 100px minmax(100px,1fr) auto", alignItems: "center", padding: "12px 14px", gap: 0 }}>
+                    {/* Name (clickable) */}
+                    <button onClick={() => expandProject(p.id)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
+                      <span style={{ fontWeight: 600, color: CLR.accent, fontSize: 14, textDecoration: "underline", textDecorationStyle: "dotted", textUnderlineOffset: 3 }}>
+                        {expanded === p.id ? "▾" : "▸"} {p.name}
+                      </span>
+                    </button>
+                    {/* Tier */}
+                    <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}14`, padding: "2px 8px", borderRadius: 5, border: `1px solid ${TIER_COLOR[p.tier] ?? CLR.muted}28`, display: "inline-flex", alignSelf: "center" }}>
+                      TIER {p.tier}
+                    </span>
+                    {/* Status */}
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: ONLINE_STATUS_COLOR[p.status] ?? CLR.muted2, background: ONLINE_STATUS_BG[p.status] ?? "#f8fafc", padding: "3px 9px", borderRadius: 20, border: `1px solid ${(ONLINE_STATUS_COLOR[p.status] ?? CLR.muted2)}30` }}>
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: ONLINE_STATUS_COLOR[p.status] ?? CLR.muted2, flexShrink: 0 }} />
+                      {p.status}
+                    </span>
+                    {/* Activations */}
+                    <span style={{ fontSize: 13, color: CLR.muted }}>
+                      {p.activation_count ?? 0}<span style={{ color: CLR.muted2 }}>/{p.max_activations}</span>
+                    </span>
+                    {/* Expires */}
+                    <span style={{ fontSize: 12, color: CLR.muted }}>{p.expires_at ?? "—"}</span>
+                    {/* Actions */}
+                    <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "flex-end" }}>
+                      <button onClick={() => openEdit(p)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, cursor: "pointer" }}>Edit</button>
+                      <button onClick={() => { setRenewId(p.id); setRenewDays(365); setRenewError(null); }} style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: CLR.amberBg, border: `1px solid ${CLR.amberBdr}`, color: CLR.amber, cursor: "pointer" }}>Renew</button>
+                      <button
+                        onClick={() => toggleActive(p)}
+                        disabled={!!toggleLoading[p.id]}
+                        style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: p.is_active ? CLR.dangerBg : CLR.greenBg, border: `1px solid ${p.is_active ? CLR.dangerBdr : CLR.greenBdr}`, color: p.is_active ? CLR.danger : CLR.green, cursor: toggleLoading[p.id] ? "not-allowed" : "pointer", opacity: toggleLoading[p.id] ? 0.65 : 1 }}
+                      >
+                        {toggleLoading[p.id] ? <Spinner /> : (p.is_active ? "Deactivate" : "Activate")}
+                      </button>
+                      <button onClick={() => { setDeleteId(p.id); setDeleteInput(""); setDeleteError(null); }} style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, color: CLR.danger, cursor: "pointer" }}>Delete</button>
+                    </div>
+                  </div>
+
+                  {/* Inline edit form */}
+                  {editId === p.id && (
+                    <div style={{ borderTop: `1px solid ${CLR.border}`, padding: "20px 20px", background: "#f8fafc" }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: CLR.text, marginBottom: 14 }}>Edit Project</div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+                        <div style={{ gridColumn: "1 / -1" }}>
+                          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Project Name</label>
+                          <input value={editName} onChange={(e) => setEditName(e.target.value)} style={inputStyle}
+                            onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+                            onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Max Activations</label>
+                          <input type="number" min={1} value={editMaxAct} onChange={(e) => setEditMaxAct(Number(e.target.value))} style={inputStyle}
+                            onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+                            onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Duration (days)</label>
+                          <input type="number" min={1} value={editDurDays} onChange={(e) => setEditDurDays(Number(e.target.value))} style={inputStyle}
+                            onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+                            onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 14 }}>
+                        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Tier</label>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          {[1, 2, 3].map((t) => (
+                            <button key={t} type="button" onClick={() => setEditTier(t)} style={toggleBtn(editTier === t, TIER_COLOR[t])}>Tier {t}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 14 }}>
+                        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
+                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                          {ONLINE_METER_OPTIONS.map((opt) => (
+                            <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                              <div onClick={() => toggleEditMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${editMeters.includes(opt.id) ? CLR.accent : CLR.border}`, background: editMeters.includes(opt.id) ? CLR.accentDim : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                                {editMeters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
+                              </div>
+                              <span style={{ fontSize: 13, color: editMeters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 14 }}>
+                        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Protocols</label>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {(["RTU", "TCP", "All"] as const).map((pr) => (
+                            <button key={pr} type="button" onClick={() => setEditProtocols(pr)} style={toggleBtn(editProtocols === pr)}>{pr}</button>
+                          ))}
+                        </div>
+                      </div>
+                      <div style={{ marginBottom: 14 }}>
+                        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Notes</label>
+                        <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical" as const }}
+                          onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+                          onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+                      </div>
+                      {editError && <div style={{ padding: "9px 12px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13, marginBottom: 14 }}>{editError}</div>}
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <button onClick={() => saveEdit(p.id)} disabled={editing} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 18px", borderRadius: 8, background: CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 13, cursor: editing ? "not-allowed" : "pointer", opacity: editing ? 0.65 : 1 }}>
+                          {editing ? <Spinner /> : <><Check size={13} /> Save Changes</>}
+                        </button>
+                        <button onClick={() => setEditId(null)} style={{ padding: "9px 16px", borderRadius: 8, background: "#fff", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Expanded detail */}
+                  {expanded === p.id && (
+                    <div style={{ borderTop: `1px solid ${CLR.border}`, padding: "20px 20px", background: "#fafcff" }}>
+                      {/* Details panel */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: 10, marginBottom: 20 }}>
+                        <div style={{ background: "#fff", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Project Key</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 12, color: CLR.accent }}>
+                              {p.project_key ? `${p.project_key.slice(0, 8)}...${p.project_key.slice(-4)}` : "—"}
+                            </span>
+                            {p.project_key && (
+                              <button onClick={() => copyProjectKey(p.project_key, p.id)} style={{ background: "none", border: "none", cursor: "pointer", color: copiedProjectKey === p.id ? CLR.green : CLR.muted, display: "flex", alignItems: "center", padding: 0 }}>
+                                {copiedProjectKey === p.id ? <Check size={12} /> : <Copy size={12} />}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {p.notes && (
+                          <div style={{ background: "#fff", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                            <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Notes</div>
+                            <div style={{ fontSize: 13, color: CLR.text }}>{p.notes}</div>
+                          </div>
+                        )}
+                        <div style={{ background: "#fff", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Meters</div>
+                          <div style={{ fontSize: 12, color: CLR.text }}>{(p.allowed_meters ?? []).join(", ") || "—"}</div>
+                        </div>
+                        <div style={{ background: "#fff", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Protocols</div>
+                          <div style={{ fontSize: 13, color: CLR.text }}>{p.protocols ?? "—"}</div>
+                        </div>
+                      </div>
+
+                      {/* Clients */}
+                      {p.clients && p.clients.length > 0 && (
+                        <div style={{ marginBottom: 20 }}>
+                          <div style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Assigned Clients</div>
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                            {p.clients.map((c) => (
+                              <span key={c.id} style={{ background: CLR.accentDim, border: "1px solid #bfdbfe", borderRadius: 5, padding: "3px 10px", fontSize: 12, color: CLR.accent, fontWeight: 500 }}>{c.email}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Activations */}
+                      <div>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>Activations / Nodes</div>
+                        {activationsLoading[p.id] ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 8, color: CLR.muted, fontSize: 13 }}><Spinner /> Loading…</div>
+                        ) : (activations[p.id] ?? []).length === 0 ? (
+                          <div style={{ fontSize: 13, color: CLR.muted2 }}>No activations yet.</div>
+                        ) : (
+                          <div style={{ ...card(), overflow: "hidden" }}>
+                            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
+                              <thead>
+                                <tr>
+                                  {["Node Name", "Machine ID", "Last Seen", "Active"].map((h) => (
+                                    <th key={h} style={{ ...thStyle, background: "#f8fafc" }}>{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(activations[p.id] ?? []).map((a) => {
+                                  const nKey = `${p.id}-${a.machine_id}`;
+                                  return (
+                                    <tr key={a.machine_id}>
+                                      <td style={{ ...tdStyle, fontWeight: 500 }}>{a.node_name || "—"}</td>
+                                      <td style={{ ...tdStyle, fontFamily: "'Share Tech Mono',monospace", fontSize: 12, color: CLR.muted }}>{a.machine_id}</td>
+                                      <td style={{ ...tdStyle, color: CLR.muted }}>{a.last_seen || "—"}</td>
+                                      <td style={tdStyle}>
+                                        <button
+                                          onClick={() => toggleNode(p.id, a.machine_id, a.is_active)}
+                                          disabled={!!nodeToggleLoading[nKey]}
+                                          style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 5, background: a.is_active ? CLR.greenBg : "#f8fafc", border: `1px solid ${a.is_active ? CLR.greenBdr : CLR.border}`, color: a.is_active ? CLR.green : CLR.muted, cursor: nodeToggleLoading[nKey] ? "not-allowed" : "pointer", opacity: nodeToggleLoading[nKey] ? 0.65 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}
+                                        >
+                                          {nodeToggleLoading[nKey] ? <Spinner /> : (a.is_active ? "Active" : "Inactive")}
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </Fragment>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── License Tab ──────────────────────────────────────────────────────────────
 type LicenseMode     = "Offline Air-Gapped" | "Online SaaS";
 type LicenseProtocol = "RTU Only" | "TCP Only" | "All Protocols";
@@ -993,7 +1692,7 @@ function LicenseTab() {
 
   return (
     <div className="admin-fade">
-      <SectionHeader title="License Generator" sub="Generate TechniDAQ client licenses" />
+      <SectionHeader title="Offline Licenses" sub="Generate TechniDAQ offline client licenses" />
 
       <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 24, maxWidth: 820 }}>
         {/* Form */}
@@ -1168,13 +1867,14 @@ function LicenseTab() {
 }
 
 // ─── Main AdminDashboard ──────────────────────────────────────────────────────
-type Tab = "fleet" | "clients" | "create" | "licenses";
+type Tab = "fleet" | "clients" | "create" | "online-projects" | "licenses";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: "fleet",    label: "Global Fleet",      icon: <Globe size={15} />    },
-  { id: "clients",  label: "Client Management", icon: <Users size={15} />    },
-  { id: "create",   label: "Create User",       icon: <UserPlus size={15} /> },
-  { id: "licenses", label: "License Generator", icon: <Key size={15} />      },
+  { id: "fleet",           label: "Global Fleet",      icon: <Globe size={15} />    },
+  { id: "clients",         label: "Client Management", icon: <Users size={15} />    },
+  { id: "create",          label: "Create User",       icon: <UserPlus size={15} /> },
+  { id: "online-projects", label: "Online Projects",   icon: <Zap size={15} />      },
+  { id: "licenses",        label: "Offline Licenses",  icon: <Key size={15} />      },
 ];
 
 export default function AdminDashboard() {
@@ -1272,10 +1972,11 @@ export default function AdminDashboard() {
 
         {/* Main Content */}
         <main style={{ flex: 1, overflow: "auto", padding: "32px 36px" }}>
-          {tab === "fleet"    && <FleetTab />}
-          {tab === "clients"  && <ClientsTab />}
-          {tab === "create"   && <CreateUserTab />}
-          {tab === "licenses" && <LicenseTab />}
+          {tab === "fleet"           && <FleetTab />}
+          {tab === "clients"         && <ClientsTab />}
+          {tab === "create"          && <CreateUserTab />}
+          {tab === "online-projects" && <OnlineProjectsTab />}
+          {tab === "licenses"        && <LicenseTab />}
         </main>
       </div>
     </>

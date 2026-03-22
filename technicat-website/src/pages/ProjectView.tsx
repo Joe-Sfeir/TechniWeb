@@ -181,6 +181,9 @@ function WaveformChart({ history, chartKeys, isLive, tabAccent, isDark }: {
   history: ChartPoint[]; chartKeys: string[]; isLive: boolean; tabAccent: string; isDark: boolean;
 }) {
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
+  const [chartVisibleVars, setChartVisibleVars] = useState<Set<string>>(() => new Set(chartKeys));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { setChartVisibleVars(new Set(chartKeys)); }, [chartKeys.join(",")]);
 
   const gridColor = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)";
   const axisTick  = CLR.text3(isDark);
@@ -237,6 +240,27 @@ function WaveformChart({ history, chartKeys, isLive, tabAccent, isDark }: {
         </div>
       </div>
 
+      {/* Chart var toggles */}
+      {viewMode === "chart" && chartKeys.length > 0 && (
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", padding: "8px 16px", borderBottom: `1px solid ${CLR.border(isDark)}`, flexShrink: 0 }}>
+          <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.5rem", letterSpacing: "0.18em", textTransform: "uppercase", color: CLR.text3(isDark), marginRight: "2px" }}>LINES</span>
+          {chartKeys.map((k, i) => {
+            const on = chartVisibleVars.has(k);
+            const c  = LINE_COLORS[i % LINE_COLORS.length];
+            return (
+              <button
+                key={k}
+                onClick={() => setChartVisibleVars((prev) => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s; })}
+                style={{ padding: "3px 12px", height: "24px", borderRadius: "20px", background: on ? c + "22" : "transparent", border: `1px solid ${on ? c + "88" : CLR.border(isDark)}`, color: on ? c : CLR.text3(isDark), fontFamily: "'Share Tech Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.06em", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", transition: "all 0.12s" }}
+              >
+                <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: on ? c : CLR.borderDim(isDark), flexShrink: 0 }} />
+                {k}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* Chart */}
       {viewMode === "chart" && (
         <div style={{ flex: "1 1 0", minHeight: "280px", padding: "8px 4px 8px 0", position: "relative" }}>
@@ -253,9 +277,11 @@ function WaveformChart({ history, chartKeys, isLive, tabAccent, isDark }: {
                 ))}
                 <Tooltip contentStyle={{ background: isDark ? "#1c2128" : "#ffffff", border: `1px solid ${CLR.border(isDark)}`, borderRadius: "6px", padding: "8px 12px", fontFamily: "'Share Tech Mono',monospace", fontSize: "0.66rem", color: CLR.text1(isDark), boxShadow: "0 4px 16px rgba(0,0,0,0.3)" }} cursor={{ stroke: CLR.borderDim(isDark), strokeWidth: 1, strokeDasharray: "4 4" }} />
                 <Legend wrapperStyle={{ display: "none" }} />
-                {chartKeys.map((k, i) => (
-                  <Line key={k} yAxisId={i === 0 ? "l" : "r"} type="monotone" dataKey={k} stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: LINE_COLORS[i % LINE_COLORS.length] }} isAnimationActive={false} />
-                ))}
+                {chartKeys.map((k, i) =>
+                  chartVisibleVars.has(k) ? (
+                    <Line key={k} yAxisId={i === 0 ? "l" : "r"} type="monotone" dataKey={k} stroke={LINE_COLORS[i % LINE_COLORS.length]} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: LINE_COLORS[i % LINE_COLORS.length] }} isAnimationActive={false} />
+                  ) : null
+                )}
               </LineChart>
             </ResponsiveContainer>
           )}
