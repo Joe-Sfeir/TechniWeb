@@ -1293,7 +1293,7 @@ function OnlineProjectsTab() {
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Tier</label>
             <div style={{ display: "flex", gap: 8 }}>
-              {[1, 2, 3].map((t) => (
+              {[1, 2].map((t) => (
                 <button key={t} type="button" onClick={() => setTier(t)} style={toggleBtn(tier === t, TIER_COLOR[t])}>Tier {t}</button>
               ))}
             </div>
@@ -1439,7 +1439,7 @@ function OnlineProjectsTab() {
                       <div style={{ marginBottom: 14 }}>
                         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Tier</label>
                         <div style={{ display: "flex", gap: 8 }}>
-                          {[1, 2, 3].map((t) => (
+                          {[1, 2].map((t) => (
                             <button key={t} type="button" onClick={() => setEditTier(t)} style={toggleBtn(editTier === t, TIER_COLOR[t])}>Tier {t}</button>
                           ))}
                         </div>
@@ -1582,7 +1582,6 @@ function OnlineProjectsTab() {
 }
 
 // ─── License Tab ──────────────────────────────────────────────────────────────
-type LicenseMode     = "Offline Air-Gapped" | "Online SaaS";
 type LicenseProtocol = "RTU Only" | "TCP Only" | "All Protocols";
 
 function LicenseTab() {
@@ -1590,7 +1589,6 @@ function LicenseTab() {
   const [username,    setUsername]    = useState("");
   const [projectName, setProjectName] = useState("");
   const [tier,        setTier]        = useState(1);
-  const [mode,        setMode]        = useState<LicenseMode>("Offline Air-Gapped");
   const [protocols,   setProtocols]   = useState<LicenseProtocol>("All Protocols");
   const [ttl,         setTtl]         = useState(365);
   const [meters,      setMeters]      = useState<string[]>(["schneider_pm2220"]);
@@ -1601,6 +1599,8 @@ function LicenseTab() {
   const [licenseHistory, setLicenseHistory] = useState<LicenseRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError,   setHistoryError]   = useState<string | null>(null);
+  const [hiddenLicenses, setHiddenLicenses] = useState<Set<string>>(new Set());
+  const [showHidden,     setShowHidden]     = useState(false);
 
   useEffect(() => {
     const token = getToken();
@@ -1618,13 +1618,6 @@ function LicenseTab() {
     })();
   }, [navigate]);
 
-  const isOffline = mode === "Offline Air-Gapped";
-
-  function handleModeChange(m: LicenseMode) {
-    setMode(m);
-    if (m === "Offline Air-Gapped") setTier(1);
-  }
-
   function toggleMeter(id: string) {
     setMeters((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
   }
@@ -1634,17 +1627,15 @@ function LicenseTab() {
     setError(null); setResult(null); setLoading(true);
     try {
       const token = getToken();
-      const backendMode      = isOffline ? "offline" : "online";
       const backendProtocols = protocols === "RTU Only" ? "RTU" : protocols === "TCP Only" ? "TCP" : "All";
       const body: Record<string, unknown> = {
         user_name:      username,
         project_name:   projectName,
-        mode:           backendMode,
+        mode:           "offline",
         protocols:      backendProtocols,
         ttl_hours:      ttl * 24,
         allowed_meters: meters,
       };
-      if (!isOffline) body.tier = tier;
       const res = await fetch(`${API_BASE}/api/admin/generate-license`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -1658,8 +1649,8 @@ function LicenseTab() {
         license_key:  data.license_key ?? "",
         username,
         project_name: projectName,
-        tier:         isOffline ? undefined : tier,
-        mode,
+        tier:         undefined,
+        mode:         "Offline Air-Gapped",
         protocols,
         expires_at:   exp,
       });
@@ -1709,26 +1700,6 @@ function LicenseTab() {
               onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
               onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
           </div>
-
-          <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Mode</label>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              {(["Offline Air-Gapped", "Online SaaS"] as const).map((m) => (
-                <button key={m} type="button" onClick={() => handleModeChange(m)} style={toggleBtn(mode === m)}>{m}</button>
-              ))}
-            </div>
-          </div>
-
-          {!isOffline && (
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Tier</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {[1, 2].map((t) => (
-                  <button key={t} type="button" onClick={() => setTier(t)} style={toggleBtn(tier === t, TIER_COLOR[t])}>Tier {t}</button>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Protocols</label>
@@ -1819,9 +1790,17 @@ function LicenseTab() {
 
       {/* License History */}
       <div style={{ marginTop: 40 }}>
-        <div style={{ marginBottom: 16 }}>
-          <h3 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 16, color: CLR.text, letterSpacing: "-0.02em", margin: 0 }}>License History</h3>
-          <p style={{ fontSize: 13, color: CLR.muted, marginTop: 4, marginBottom: 0 }}>All previously generated licenses</p>
+        <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+          <div>
+            <h3 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 16, color: CLR.text, letterSpacing: "-0.02em", margin: 0 }}>License History</h3>
+            <p style={{ fontSize: 13, color: CLR.muted, marginTop: 4, marginBottom: 0 }}>All previously generated licenses</p>
+          </div>
+          {hiddenLicenses.size > 0 && (
+            <button type="button" onClick={() => setShowHidden((v) => !v)}
+              style={{ padding: "6px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", background: showHidden ? CLR.accentDim : "#f8fafc", border: `1px solid ${showHidden ? "#bfdbfe" : CLR.border}`, color: showHidden ? CLR.accent : CLR.muted, transition: "all 0.15s" }}>
+              {showHidden ? "Hide hidden" : `Show hidden (${hiddenLicenses.size})`}
+            </button>
+          )}
         </div>
         {historyLoading ? (
           <div style={{ display: "flex", justifyContent: "center", padding: 32 }}><Spinner /></div>
@@ -1835,14 +1814,14 @@ function LicenseTab() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
                 <thead>
                   <tr>
-                    {["Username", "Project", "Mode", "Tier", "Protocols", "Expires", "Created"].map((h) => (
+                    {["Username", "Project", "Mode", "Tier", "Protocols", "Expires", "Created", ""].map((h) => (
                       <th key={h} style={{ textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase" as const, whiteSpace: "nowrap" as const, borderBottom: `1px solid ${CLR.border}`, background: "#f8fafc" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {licenseHistory.map((r) => (
-                    <tr key={r.id}>
+                  {licenseHistory.filter((r) => showHidden || !hiddenLicenses.has(String(r.id))).map((r) => (
+                    <tr key={r.id} style={{ opacity: hiddenLicenses.has(String(r.id)) ? 0.4 : 1 }}>
                       <td style={{ padding: "11px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9`, fontWeight: 500 }}>{r.username}</td>
                       <td style={{ padding: "11px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>{r.project_name}</td>
                       <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>{r.mode}</td>
@@ -1854,6 +1833,12 @@ function LicenseTab() {
                       <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>{r.protocols}</td>
                       <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9`, whiteSpace: "nowrap" as const }}>{r.expires_at}</td>
                       <td style={{ padding: "11px 14px", color: CLR.muted2, fontSize: 12, borderBottom: `1px solid #f1f5f9`, whiteSpace: "nowrap" as const }}>{r.created_at}</td>
+                      <td style={{ padding: "11px 14px", borderBottom: `1px solid #f1f5f9` }}>
+                        <button type="button" onClick={() => setHiddenLicenses((prev) => { const next = new Set(prev); if (next.has(String(r.id))) next.delete(String(r.id)); else next.add(String(r.id)); return next; })}
+                          style={{ padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: "pointer", background: hiddenLicenses.has(String(r.id)) ? CLR.accentDim : "#f8fafc", border: `1px solid ${hiddenLicenses.has(String(r.id)) ? "#bfdbfe" : CLR.border}`, color: hiddenLicenses.has(String(r.id)) ? CLR.accent : CLR.muted, whiteSpace: "nowrap" }}>
+                          {hiddenLicenses.has(String(r.id)) ? "Show" : "Hide"}
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
