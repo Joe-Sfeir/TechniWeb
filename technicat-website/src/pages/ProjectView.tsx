@@ -10,10 +10,9 @@ import { API_URL } from "../config";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const MAX_HISTORY      = 120;
-const SPARK_HISTORY    = 20;
-const POLL_MS          = 3000;
-const DEVICE_STALE_MS  = 5 * 60 * 1000;
+const MAX_HISTORY   = 120;
+const SPARK_HISTORY = 20;
+const POLL_MS       = 3000;
 
 // Keys in a telemetry row that are NOT variables
 const NON_VAR = new Set(["timestamp", "device_name", "id", "project_id", "created_at", "updated_at"]);
@@ -345,9 +344,9 @@ export default function ProjectView() {
   const [history,     setHistory]     = useState<Record<string, ChartPoint[]>>({});
   const [sparkHistory,setSparkHistory]= useState<Record<string, Record<string, number[]>>>({});
   const [projectName, setProjectName] = useState(`Project #${projectId}`);
-  const [lastPollMs,     setLastPollMs]     = useState(0);
-  const [deviceLastSeen, setDeviceLastSeen] = useState<Record<string, number>>({});
-  const [showAllDevices, setShowAllDevices] = useState(false);
+  const [lastPollMs,       setLastPollMs]       = useState(0);
+  const [deviceMissedPolls,setDeviceMissedPolls]= useState<Record<string, number>>({});
+  const [showAllDevices,   setShowAllDevices]   = useState(false);
   const [loading,        setLoading]        = useState(true);
   const [demoMode,       setDemoMode]       = useState(false);
   const [exporting,   setExporting]   = useState(false);
@@ -355,7 +354,11 @@ export default function ProjectView() {
   const [fetchError,  setFetchError]  = useState<string | null>(null);
 
   const lastTimestampRef = useRef<string | null>(null);
+  const devicesRef       = useRef<string[]>([]);
   const isDark           = theme === "dark";
+
+  // Keep devicesRef in sync so processRows (useCallback []) can read it without a stale closure
+  useEffect(() => { devicesRef.current = devices; }, [devices]);
 
   // ── CSS injection ──
   useEffect(() => {
@@ -438,15 +441,21 @@ export default function ProjectView() {
     lastTimestampRef.current = newest;
     setLastPollMs(Date.now());
 
-    // Track per-device last-seen (from row timestamps, not wall clock)
-    const perDeviceNewest: Record<string, number> = {};
-    rows.forEach((row) => {
-      const ms = new Date(row.timestamp).getTime();
-      if (!perDeviceNewest[row.device_name] || ms > perDeviceNewest[row.device_name]) {
-        perDeviceNewest[row.device_name] = ms;
-      }
-    });
-    setDeviceLastSeen((prev) => ({ ...prev, ...perDeviceNewest }));
+    // Track consecutive missed polls per device
+    if (replace) {
+      // Initial load — clean slate, all devices active
+      setDeviceMissedPolls({});
+    } else {
+      // Incremental poll — devices absent from this batch get +1 missed, present ones reset to 0
+      const pollDeviceSet = new Set(devList);
+      setDeviceMissedPolls((prev) => {
+        const next = { ...prev };
+        devicesRef.current.forEach((d) => {
+          next[d] = pollDeviceSet.has(d) ? 0 : (next[d] ?? 0) + 1;
+        });
+        return next;
+      });
+    }
   }, []);
 
   // ── Initial fetch ──
@@ -529,10 +538,9 @@ export default function ProjectView() {
   const timeStr        = lastPollMs > 0 ? new Date(lastPollMs).toLocaleTimeString("en-GB", { hour12: false }) : "--:--:--";
   const isLive         = !demoMode;
 
-  const inactiveDeviceSet = useMemo(() => {
-    const now = Date.now();
-    return new Set(devices.filter((d) => deviceLastSeen[d] !== undefined && now - deviceLastSeen[d] > DEVICE_STALE_MS));
-  }, [devices, deviceLastSeen, lastPollMs]); // eslint-disable-line react-hooks/exhaustive-deps
+  const inactiveDeviceSet = useMemo(() =>
+    new Set(devices.filter((d) => (deviceMissedPolls[d] ?? 0) >= 2)),
+  [devices, deviceMissedPolls]);
 
   const visibleDevices = useMemo(() => {
     if (showAllDevices) return devices;
