@@ -703,7 +703,6 @@ export default function ProjectView() {
             </div>
           );
         })()}
-        )}
 
         {/* Metric cards — only visible vars */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 175px), 1fr))", gap: "12px" }}>
