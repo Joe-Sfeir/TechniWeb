@@ -57,7 +57,8 @@ const SCADA_CSS = `
   }
   [data-theme="dark"]  { --pg: #0f1117; --dot: rgba(255,255,255,0.055); }
   [data-theme="light"] { --pg: #f1f5f9; --dot: rgba(15,23,42,0.07); }
-  @keyframes pulse-dot  { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  @keyframes pulse-dot   { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  @keyframes pulse-alarm { 0%,100%{box-shadow:0 0 0 1.5px #ef4444,0 0 8px #ef444433} 50%{box-shadow:0 0 0 1.5px #ef4444,0 0 18px #ef444466} }
 `;
 
 const TAB_ACCENTS = [CLR.blue, CLR.green, CLR.amber, CLR.purple, CLR.red, CLR.teal, CLR.orange, CLR.indigo];
@@ -94,9 +95,10 @@ interface TelemetryRow {
   [key: string]: string | number;
 }
 
-type ChartPoint = Record<string, string | number>;
-type Theme      = "dark" | "light";
-type ViewMode   = "chart" | "grid";
+type ChartPoint    = Record<string, string | number>;
+type Theme         = "dark" | "light";
+type ViewMode      = "chart" | "grid";
+type ThresholdMap  = Record<string, Record<string, { min: number | null; max: number | null }>>;
 
 // ─── Demo data (offline fallback) ─────────────────────────────────────────────
 
@@ -118,36 +120,42 @@ const DEMO_ROWS: TelemetryRow[] = Array.from({ length: 30 }, (_, i) => {
 
 // ─── MetricCard ───────────────────────────────────────────────────────────────
 
-function MetricCard({ name, value, idx, isDark, sparkData }: {
+function MetricCard({ name, value, idx, isDark, sparkData, minThreshold, maxThreshold }: {
   name: string; value: number | undefined; idx: number; isDark: boolean; sparkData?: number[];
+  minThreshold?: number | null; maxThreshold?: number | null;
 }) {
-  const p      = regPalette(name, idx);
-  const hasVal = value !== undefined && !isNaN(value);
-  const abs    = hasVal ? Math.abs(value!) : 0;
-  const display = hasVal
+  const p        = regPalette(name, idx);
+  const hasVal   = value !== undefined && !isNaN(value);
+  const abs      = hasVal ? Math.abs(value!) : 0;
+  const display  = hasVal
     ? (abs >= 10000 ? value!.toFixed(0) : abs >= 100 ? value!.toFixed(1) : abs >= 1 ? value!.toFixed(2) : value!.toFixed(4))
     : "——";
+  const isAlarm  = hasVal && (
+    (maxThreshold != null && value! > maxThreshold) ||
+    (minThreshold != null && value! < minThreshold)
+  );
+  const accentColor = isAlarm ? CLR.red : p.border;
 
   return (
-    <div style={{ ...glass(isDark), padding: 0, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", position: "relative" }}>
-      <div style={{ height: "2px", width: "100%", flexShrink: 0, background: `linear-gradient(90deg, ${p.border}, ${p.border}88, transparent)` }} />
+    <div style={{ ...glass(isDark), padding: 0, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", position: "relative", animation: isAlarm ? "pulse-alarm 1.5s ease-in-out infinite" : "none" }}>
+      <div style={{ height: "2px", width: "100%", flexShrink: 0, background: `linear-gradient(90deg, ${accentColor}, ${accentColor}88, transparent)` }} />
       <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
         <div style={{ fontSize: "0.6rem", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: CLR.text3(isDark), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
         <div style={{ fontSize: "1.75rem", fontWeight: 700, fontFamily: "'Share Tech Mono',monospace", letterSpacing: "-0.03em", lineHeight: 1, color: hasVal ? CLR.text1(isDark) : CLR.text3(isDark) }}>{display}</div>
         <div style={{ height: "2px", borderRadius: "1px", background: CLR.borderDim(isDark), overflow: "hidden" }}>
-          {hasVal && <div style={{ height: "100%", borderRadius: "1px", width: `${Math.min(100, (Math.abs(value!) / 500) * 100)}%`, background: `linear-gradient(90deg,${p.border},${p.border}99)`, transition: "width 0.5s ease" }} />}
+          {hasVal && <div style={{ height: "100%", borderRadius: "1px", width: `${Math.min(100, (Math.abs(value!) / 500) * 100)}%`, background: `linear-gradient(90deg,${accentColor},${accentColor}99)`, transition: "width 0.5s ease" }} />}
         </div>
       </div>
       {sparkData && sparkData.length > 1 && (
         <div style={{ padding: "0 16px 10px", marginTop: "-4px" }}>
           <ResponsiveContainer width="100%" height={36}>
             <LineChart data={sparkData.map((v, i) => ({ i, v }))} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-              <Line type="monotone" dataKey="v" stroke={p.border} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+              <Line type="monotone" dataKey="v" stroke={accentColor} strokeWidth={1.5} dot={false} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       )}
-      <div style={{ position: "absolute", bottom: 0, right: 0, width: "60px", height: "60px", background: `radial-gradient(circle at 100% 100%, ${p.border}22, transparent 70%)`, pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: 0, right: 0, width: "60px", height: "60px", background: `radial-gradient(circle at 100% 100%, ${accentColor}22, transparent 70%)`, pointerEvents: "none" }} />
     </div>
   );
 }
@@ -344,7 +352,9 @@ export default function ProjectView() {
   const [history,     setHistory]     = useState<Record<string, ChartPoint[]>>({});
   const [sparkHistory,setSparkHistory]= useState<Record<string, Record<string, number[]>>>({});
   const [projectName, setProjectName] = useState(`Project #${projectId}`);
+  const [thresholds,  setThresholds]  = useState<ThresholdMap>({});
   const [lastPollMs,       setLastPollMs]       = useState(0);
+  const [lastDataMs,       setLastDataMs]       = useState(0);
   const [deviceMissedPolls,setDeviceMissedPolls]= useState<Record<string, number>>({});
   const [showAllDevices,   setShowAllDevices]   = useState(false);
   const [loading,        setLoading]        = useState(true);
@@ -440,6 +450,7 @@ export default function ProjectView() {
     const newest = rows.reduce((best, r) => r.timestamp > best ? r.timestamp : best, rows[0].timestamp);
     lastTimestampRef.current = newest;
     setLastPollMs(Date.now());
+    setLastDataMs(Date.now());
 
     // Track consecutive missed polls per device
     if (replace) {
@@ -468,9 +479,10 @@ export default function ProjectView() {
         if (handleAuthError(r, navigate)) return;
         if (r.status === 403) { navigate(backTo); return; }
         if (!r.ok) { setFetchError(`Server error (${r.status}) — contact support.`); return; }
-        const data = await r.json() as { project_name?: string; rows: TelemetryRow[] } | TelemetryRow[];
+        const data = await r.json() as { project_name?: string; rows: TelemetryRow[]; thresholds?: ThresholdMap } | TelemetryRow[];
         const rows = Array.isArray(data) ? data : (data.rows ?? []);
         if (!Array.isArray(data) && data.project_name) setProjectName(data.project_name);
+        if (!Array.isArray(data) && data.thresholds) setThresholds(data.thresholds);
         processRows(rows, true);
       } catch {
         processRows(DEMO_ROWS, true);
@@ -492,8 +504,9 @@ export default function ProjectView() {
         const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         if (handleAuthError(r, navigate)) return;
         if (!r.ok) return;
-        const data = await r.json() as { rows?: TelemetryRow[] } | TelemetryRow[];
+        const data = await r.json() as { rows?: TelemetryRow[]; thresholds?: ThresholdMap } | TelemetryRow[];
         const rows = Array.isArray(data) ? data : (data.rows ?? []);
+        if (!Array.isArray(data) && data.thresholds) setThresholds(data.thresholds);
         if (rows.length > 0) processRows(rows, false);
         else setLastPollMs(Date.now());
       } catch { /* silent for transient network failures */ }
@@ -536,7 +549,13 @@ export default function ProjectView() {
   const activeSpark    = sparkHistory[activeTab] ?? {};
   const tabAccent      = TAB_ACCENTS[devices.indexOf(activeTab) % TAB_ACCENTS.length] ?? CLR.blue;
   const timeStr        = lastPollMs > 0 ? new Date(lastPollMs).toLocaleTimeString("en-GB", { hour12: false }) : "--:--:--";
+  const dataTimeStr    = lastDataMs  > 0 ? new Date(lastDataMs).toLocaleTimeString("en-GB",  { hour12: false }) : "--:--:--";
   const isLive         = !demoMode;
+
+  const dataAge      = !demoMode && lastDataMs > 0 ? Date.now() - lastDataMs : 0;
+  const isStale      = dataAge > 30_000;
+  const isVeryStale  = dataAge > 5 * 60_000;
+  const staleMinutes = Math.floor(dataAge / 60_000);
 
   const inactiveDeviceSet = useMemo(() =>
     new Set(devices.filter((d) => (deviceMissedPolls[d] ?? 0) >= 2)),
@@ -612,11 +631,11 @@ export default function ProjectView() {
 
           <div style={{ width: "1px", height: "28px", background: CLR.border(isDark) }} />
 
-          {/* Live / Demo status */}
+          {/* Live / Stale / Offline / Demo status */}
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: isLive ? CLR.green : CLR.amber, boxShadow: isLive ? `0 0 8px ${CLR.green}` : "none", animation: isLive ? "pulse-dot 2s ease-in-out infinite" : "none" }} />
-            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.12em", fontWeight: 600, color: isLive ? CLR.green : CLR.amber }}>
-              {isLive ? "LIVE" : "DEMO"}
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: !isLive ? CLR.amber : isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green, boxShadow: isLive && !isStale ? `0 0 8px ${CLR.green}` : "none", animation: isLive && !isStale ? "pulse-dot 2s ease-in-out infinite" : "none" }} />
+            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.12em", fontWeight: 600, color: !isLive ? CLR.amber : isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green }}>
+              {!isLive ? "DEMO" : isVeryStale ? "OFFLINE" : isStale ? "STALE" : "LIVE"}
             </span>
           </div>
 
@@ -649,6 +668,20 @@ export default function ProjectView() {
           </button>
         </div>
       </header>
+
+      {/* ══ Polling-stopped banner ══ */}
+      {isVeryStale && (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 20px", flexShrink: 0, background: CLR.red + "18", borderBottom: `1px solid ${CLR.red}44`, color: CLR.red, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.08em" }}>
+          <span>⚠</span>
+          <span>No data received for {staleMinutes} minute{staleMinutes !== 1 ? "s" : ""} — the monitoring device may be offline</span>
+        </div>
+      )}
+      {isStale && !isVeryStale && (
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 20px", flexShrink: 0, background: CLR.amber + "15", borderBottom: `1px solid ${CLR.amber}44`, color: CLR.amber, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.08em" }}>
+          <span>⚠</span>
+          <span>Polling appears to have stopped — last data received at {dataTimeStr}</span>
+        </div>
+      )}
 
       {/* ══ Device Tab Bar ══ */}
       {devices.length > 0 && (
@@ -692,17 +725,18 @@ export default function ProjectView() {
         )}
 
         {/* Last updated — visible near the data so users know polling is live */}
-        {!demoMode && lastPollMs > 0 && (() => {
-          const isStale = Date.now() - lastPollMs > 30_000;
-          return (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: isStale ? CLR.amber : CLR.green, boxShadow: isStale ? "none" : `0 0 6px ${CLR.green}`, animation: isStale ? "none" : "pulse-dot 2s ease-in-out infinite", flexShrink: 0 }} />
-              <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.6rem", letterSpacing: "0.14em", color: isStale ? CLR.amber : CLR.text2(isDark), textTransform: "uppercase" }}>
-                {isStale ? `Data may be stale — last updated: ${timeStr}` : `Last updated: ${timeStr}`}
-              </span>
-            </div>
-          );
-        })()}
+        {!demoMode && lastDataMs > 0 && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green, boxShadow: isStale ? "none" : `0 0 6px ${CLR.green}`, animation: isStale ? "none" : "pulse-dot 2s ease-in-out infinite", flexShrink: 0 }} />
+            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.6rem", letterSpacing: "0.14em", color: isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.text2(isDark), textTransform: "uppercase" }}>
+              {isVeryStale
+                ? `Polling appears stopped — last data at ${dataTimeStr}`
+                : isStale
+                ? "Data may be stale"
+                : `Last updated: ${dataTimeStr}`}
+            </span>
+          </div>
+        )}
 
         {/* Metric cards — only visible vars */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 175px), 1fr))", gap: "12px" }}>
@@ -714,6 +748,8 @@ export default function ProjectView() {
               idx={idx}
               isDark={isDark}
               sparkData={activeSpark[varName]}
+              minThreshold={thresholds[activeTab]?.[varName]?.min}
+              maxThreshold={thresholds[activeTab]?.[varName]?.max}
             />
           ))}
         </div>
