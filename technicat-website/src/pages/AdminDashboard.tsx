@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus } from "lucide-react";
+import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus, Search, Send, Cpu, PlusCircle, Trash2 } from "lucide-react";
 import { getToken, getRole, clearAuth, handleAuthError } from "../lib/auth";
 
 import { API_URL } from "../config";
@@ -119,6 +119,26 @@ interface OnlineActivation {
   node_name: string;
   last_seen: string;
   is_active: boolean;
+  polling_state?: "running" | "stopped" | "fault";
+}
+
+interface MeterRegister {
+  name: string;
+  address: number;
+  length: 1 | 2;
+  data_type: "Float32" | "UInt16" | "UInt32" | "INT16" | "INT32";
+  multiplier: number;
+}
+
+interface MeterProfile {
+  id: string;
+  model: string;
+  display_name: string;
+  endianness: "ABCD" | "CDAB" | "BADC" | "DCBA";
+  baud_rate: number;
+  parity: "None" | "Even" | "Odd";
+  registers: MeterRegister[];
+  updated_at?: string;
 }
 
 // ─── Demo Data ────────────────────────────────────────────────────────────────
@@ -226,6 +246,7 @@ function FleetTab() {
   const [users,     setUsers]     = useState<User[]>([]);
   const [demo,      setDemo]      = useState(false);
   const [loading,   setLoading]   = useState(true);
+  const [fleetSearch,  setFleetSearch]  = useState("");
   const [assignSel,    setAssignSel]    = useState<Record<string, string>>({});
   const [assigning,    setAssigning]    = useState<Record<string, boolean>>({});
   const [assignMsg,    setAssignMsg]    = useState<Record<string, { ok: boolean; text: string }>>({});
@@ -320,8 +341,9 @@ function FleetTab() {
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>;
 
-  const assigned   = projects.filter((p) => p.clients.length > 0);
-  const unassigned = projects.filter((p) => p.clients.length === 0);
+  const fleetQ     = fleetSearch.trim().toLowerCase();
+  const assigned   = projects.filter((p) => p.clients.length > 0  && (!fleetQ || p.name.toLowerCase().includes(fleetQ)));
+  const unassigned = projects.filter((p) => p.clients.length === 0 && (!fleetQ || p.name.toLowerCase().includes(fleetQ)));
 
   const thStyle: CSSProperties = { textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", borderBottom: `1px solid ${CLR.border}`, background: "#f8fafc" };
   const tdStyle: CSSProperties = { padding: "12px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9` };
@@ -330,6 +352,18 @@ function FleetTab() {
     <div className="admin-fade">
       <SectionHeader title="Global Fleet" sub={`${projects.length} active projects across all clients`} />
       {demo && <DemoBanner />}
+
+      <div style={{ marginBottom: 16, position: "relative", maxWidth: 320 }}>
+        <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: CLR.muted2, pointerEvents: "none" }} />
+        <input
+          value={fleetSearch}
+          onChange={(e) => setFleetSearch(e.target.value)}
+          placeholder="Search projects…"
+          style={{ width: "100%", padding: "8px 12px 8px 32px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#fff", color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
+          onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+          onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }}
+        />
+      </div>
 
       {/* Assigned */}
       {assigned.length > 0 && (
@@ -625,6 +659,7 @@ function ClientsTab() {
   const [users,         setUsers]         = useState<User[]>([]);
   const [demo,          setDemo]          = useState(false);
   const [loading,       setLoading]       = useState(true);
+  const [clientSearch,  setClientSearch]  = useState("");
   const [setPassUser,   setSetPassUser]   = useState<User | null>(null);
   const [confirmDelete,   setConfirmDelete]   = useState<string | null>(null);
   const [deleteLoading,   setDeleteLoading]   = useState(false);
@@ -695,6 +730,11 @@ function ClientsTab() {
 
   if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner /></div>;
 
+  const clientQ       = clientSearch.trim().toLowerCase();
+  const filteredUsers = clientQ
+    ? users.filter((u) => u.name?.toLowerCase().includes(clientQ) || u.email?.toLowerCase().includes(clientQ))
+    : users;
+
   return (
     <div className="admin-fade">
       {setPassUser && (
@@ -710,13 +750,25 @@ function ClientsTab() {
       <SectionHeader title="Client Management" sub={`${users.length} registered users`} />
       {demo && <DemoBanner />}
 
+      <div style={{ marginBottom: 16, position: "relative", maxWidth: 320 }}>
+        <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: CLR.muted2, pointerEvents: "none" }} />
+        <input
+          value={clientSearch}
+          onChange={(e) => setClientSearch(e.target.value)}
+          placeholder="Search by name or email…"
+          style={{ width: "100%", padding: "8px 12px 8px 32px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#fff", color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
+          onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+          onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }}
+        />
+      </div>
+
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {users.length === 0 && (
+        {filteredUsers.length === 0 && (
           <div style={{ ...card(), padding: 32, textAlign: "center", color: CLR.muted, fontSize: 13 }}>
-            No users registered yet.
+            {clientQ ? "No users match your search." : "No users registered yet."}
           </div>
         )}
-        {users.map((u) => (
+        {filteredUsers.map((u) => (
           <Fragment key={u.id}>
           <div style={{
             ...card({ padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" as const }),
@@ -1014,6 +1066,16 @@ function OnlineProjectsTab() {
   // node toggle
   const [nodeToggleLoading, setNodeToggleLoading] = useState<Record<string, boolean>>({});
 
+  // push config modal
+  const [pushCfgProjectId,  setPushCfgProjectId]  = useState<string | null>(null);
+  const [pushCfgMachineId,  setPushCfgMachineId]  = useState<string | null>(null);
+  const [pushCfgRegisters,  setPushCfgRegisters]  = useState<Set<string>>(new Set());
+  const [pushCfgThresholds, setPushCfgThresholds] = useState<Record<string, { min: string; max: string }>>({});
+  const [pushCfgPollRate,   setPushCfgPollRate]   = useState(5000);
+  const [pushCfgSaving,     setPushCfgSaving]     = useState(false);
+  const [pushCfgError,      setPushCfgError]      = useState<string | null>(null);
+  const [pushCfgSuccess,    setPushCfgSuccess]    = useState<string | null>(null);
+
   useEffect(() => {
     const token = getToken();
     fetch(`${API_BASE}/api/admin/online-projects`, { headers: { Authorization: `Bearer ${token}` } })
@@ -1022,6 +1084,49 @@ function OnlineProjectsTab() {
       .catch((err) => { if (err?.message !== "auth") setFetchError("Could not load online projects."); })
       .finally(() => setLoading(false));
   }, [navigate]);
+
+  function openPushConfig(projectId: string, machineId: string, allowedMeters: string[]) {
+    setPushCfgProjectId(projectId);
+    setPushCfgMachineId(machineId);
+    setPushCfgRegisters(new Set(allowedMeters));
+    setPushCfgThresholds({});
+    setPushCfgPollRate(5000);
+    setPushCfgError(null);
+    setPushCfgSuccess(null);
+  }
+
+  async function deployConfig() {
+    if (!pushCfgProjectId || !pushCfgMachineId) return;
+    setPushCfgSaving(true);
+    setPushCfgError(null);
+    setPushCfgSuccess(null);
+    try {
+      const token = getToken();
+      const thresholds: Record<string, { min: number | null; max: number | null }> = {};
+      Object.entries(pushCfgThresholds).forEach(([reg, vals]) => {
+        thresholds[reg] = {
+          min: vals.min !== "" ? Number(vals.min) : null,
+          max: vals.max !== "" ? Number(vals.max) : null,
+        };
+      });
+      const res = await fetch(`${API_BASE}/api/admin/online-projects/${pushCfgProjectId}/push-config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          machine_id: pushCfgMachineId,
+          config: { registers: [...pushCfgRegisters], alarm_thresholds: thresholds, poll_rate_ms: pushCfgPollRate },
+        }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Deploy failed");
+      setPushCfgSuccess(`Deployed — config version ${data.config_version ?? "?"}`);
+    } catch (err) {
+      setPushCfgError(err instanceof Error ? err.message : "Deploy failed");
+    } finally {
+      setPushCfgSaving(false);
+    }
+  }
 
   function toggleMeter(id: string) {
     setMeters((prev) => prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]);
@@ -1276,6 +1381,101 @@ function OnlineProjectsTab() {
           </div>
         </div>
       )}
+
+      {/* ── Push Config Modal ────────────────────────────────────────────────── */}
+      {pushCfgProjectId && pushCfgMachineId && (() => {
+        const proj = projects.find((p) => p.id === pushCfgProjectId);
+        const allowedMeters = proj?.allowed_meters ?? [];
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)" }}>
+            <div style={{ ...card({ padding: 28, maxWidth: 520, width: "90%", position: "relative", borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.15)", maxHeight: "90vh", overflowY: "auto" }) }}>
+              <button onClick={() => { setPushCfgProjectId(null); setPushCfgMachineId(null); }} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", color: CLR.muted, cursor: "pointer" }}><X size={18} /></button>
+              <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 18, color: CLR.text, marginBottom: 2 }}>Push Config</div>
+              <div style={{ fontSize: 12, color: CLR.muted, marginBottom: 20, fontFamily: "'Share Tech Mono',monospace" }}>{pushCfgMachineId}</div>
+
+              {/* Registers */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Registers to Include</div>
+                {allowedMeters.length === 0 && (
+                  <div style={{ fontSize: 13, color: CLR.muted2 }}>No allowed meters defined for this project.</div>
+                )}
+                {allowedMeters.map((reg) => {
+                  const checked = pushCfgRegisters.has(reg);
+                  return (
+                    <div key={reg} style={{ marginBottom: 10 }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: checked ? 6 : 0 }}>
+                        <div
+                          onClick={() => setPushCfgRegisters((prev) => { const s = new Set(prev); s.has(reg) ? s.delete(reg) : s.add(reg); return s; })}
+                          style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${checked ? CLR.accent : CLR.border}`, background: checked ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}
+                        >
+                          {checked && <Check size={10} color={CLR.accent} />}
+                        </div>
+                        <span style={{ fontSize: 13, color: checked ? CLR.text : CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{reg}</span>
+                      </label>
+                      {checked && (
+                        <div style={{ display: "flex", gap: 8, marginLeft: 27 }}>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ display: "block", fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Min</label>
+                            <input
+                              type="number"
+                              value={pushCfgThresholds[reg]?.min ?? ""}
+                              onChange={(e) => setPushCfgThresholds((prev) => ({ ...prev, [reg]: { ...prev[reg], min: e.target.value } }))}
+                              placeholder="—"
+                              style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }}
+                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                              onBlur={(e) => { e.target.style.borderColor = CLR.border; }}
+                            />
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <label style={{ display: "block", fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Max</label>
+                            <input
+                              type="number"
+                              value={pushCfgThresholds[reg]?.max ?? ""}
+                              onChange={(e) => setPushCfgThresholds((prev) => ({ ...prev, [reg]: { ...prev[reg], max: e.target.value } }))}
+                              placeholder="—"
+                              style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }}
+                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                              onBlur={(e) => { e.target.style.borderColor = CLR.border; }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Poll Rate */}
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Poll Rate (ms)</label>
+                <input
+                  type="number"
+                  min={500}
+                  value={pushCfgPollRate}
+                  onChange={(e) => setPushCfgPollRate(Number(e.target.value))}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
+                  onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+                  onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }}
+                />
+              </div>
+
+              {pushCfgError   && <div style={{ padding: "9px 12px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13, marginBottom: 14 }}>{pushCfgError}</div>}
+              {pushCfgSuccess && <div style={{ padding: "9px 12px", background: CLR.greenBg,  border: `1px solid ${CLR.greenBdr}`,  borderRadius: 8, color: CLR.green,  fontSize: 13, marginBottom: 14 }}>{pushCfgSuccess}</div>}
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={deployConfig}
+                  disabled={pushCfgSaving}
+                  style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 8, background: CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 14, cursor: pushCfgSaving ? "not-allowed" : "pointer", opacity: pushCfgSaving ? 0.65 : 1 }}
+                >
+                  {pushCfgSaving ? <Spinner /> : <><Send size={14} /> Deploy</>}
+                </button>
+                <button onClick={() => { setPushCfgProjectId(null); setPushCfgMachineId(null); }} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <SectionHeader title="Online Projects" sub="Create and manage cloud-connected project keys" />
 
@@ -1595,7 +1795,7 @@ function OnlineProjectsTab() {
                             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'Inter',sans-serif" }}>
                               <thead>
                                 <tr>
-                                  {["Node Name", "Machine ID", "Last Seen", "Active"].map((h) => (
+                                  {["Node Name", "Machine ID", "Last Seen", "Polling", "Active", ""].map((h) => (
                                     <th key={h} style={{ ...thStyle, background: "#f8fafc" }}>{h}</th>
                                   ))}
                                 </tr>
@@ -1609,12 +1809,28 @@ function OnlineProjectsTab() {
                                       <td style={{ ...tdStyle, fontFamily: "'Share Tech Mono',monospace", fontSize: 12, color: CLR.muted }}>{a.machine_id}</td>
                                       <td style={{ ...tdStyle, color: CLR.muted }}>{a.last_seen || "—"}</td>
                                       <td style={tdStyle}>
+                                        {a.polling_state ? (
+                                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, color: a.polling_state === "running" ? CLR.green : a.polling_state === "fault" ? CLR.amber : CLR.muted, background: a.polling_state === "running" ? CLR.greenBg : a.polling_state === "fault" ? CLR.amberBg : "#f8fafc", border: `1px solid ${a.polling_state === "running" ? CLR.greenBdr : a.polling_state === "fault" ? CLR.amberBdr : CLR.border}` }}>
+                                            <span style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: a.polling_state === "running" ? CLR.green : a.polling_state === "fault" ? CLR.amber : CLR.muted2 }} />
+                                            {a.polling_state.toUpperCase()}
+                                          </span>
+                                        ) : <span style={{ color: CLR.muted2, fontSize: 12 }}>—</span>}
+                                      </td>
+                                      <td style={tdStyle}>
                                         <button
                                           onClick={() => toggleNode(p.id, a.machine_id, a.is_active)}
                                           disabled={!!nodeToggleLoading[nKey]}
                                           style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 5, background: a.is_active ? CLR.greenBg : "#f8fafc", border: `1px solid ${a.is_active ? CLR.greenBdr : CLR.border}`, color: a.is_active ? CLR.green : CLR.muted, cursor: nodeToggleLoading[nKey] ? "not-allowed" : "pointer", opacity: nodeToggleLoading[nKey] ? 0.65 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}
                                         >
                                           {nodeToggleLoading[nKey] ? <Spinner /> : (a.is_active ? "Active" : "Inactive")}
+                                        </button>
+                                      </td>
+                                      <td style={tdStyle}>
+                                        <button
+                                          onClick={() => openPushConfig(p.id, a.machine_id, p.allowed_meters ?? [])}
+                                          style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 5, background: "#eff6ff", border: "1px solid #bfdbfe", color: CLR.accent, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}
+                                        >
+                                          <Send size={11} /> Push Config
                                         </button>
                                       </td>
                                     </tr>
@@ -1909,8 +2125,354 @@ function LicenseTab() {
   );
 }
 
+// ─── Meter Profiles Tab ───────────────────────────────────────────────────────
+const BLANK_REGISTER = (): MeterRegister => ({ name: "", address: 0, length: 1, data_type: "Float32", multiplier: 1.0 });
+
+function MeterProfilesTab() {
+  const navigate = useNavigate();
+
+  const [profiles,     setProfiles]     = useState<MeterProfile[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [fetchError,   setFetchError]   = useState<string | null>(null);
+
+  // add form
+  const [addModel,       setAddModel]       = useState("");
+  const [addDisplayName, setAddDisplayName] = useState("");
+  const [addEndianness,  setAddEndianness]  = useState<MeterProfile["endianness"]>("ABCD");
+  const [addBaudRate,    setAddBaudRate]    = useState(9600);
+  const [addParity,      setAddParity]      = useState<MeterProfile["parity"]>("None");
+  const [addRegisters,   setAddRegisters]   = useState<MeterRegister[]>([BLANK_REGISTER()]);
+  const [saving,         setSaving]         = useState(false);
+  const [saveError,      setSaveError]      = useState<string | null>(null);
+
+  // edit
+  const [editId,          setEditId]          = useState<string | null>(null);
+  const [editModel,       setEditModel]       = useState("");
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editEndianness,  setEditEndianness]  = useState<MeterProfile["endianness"]>("ABCD");
+  const [editBaudRate,    setEditBaudRate]    = useState(9600);
+  const [editParity,      setEditParity]      = useState<MeterProfile["parity"]>("None");
+  const [editRegisters,   setEditRegisters]   = useState<MeterRegister[]>([]);
+  const [editSaving,      setEditSaving]      = useState(false);
+  const [editError,       setEditError]       = useState<string | null>(null);
+
+  // delete
+  const [deleteId,      setDeleteId]      = useState<string | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError,   setDeleteError]   = useState<string | null>(null);
+
+  // publish
+  const [publishing,     setPublishing]     = useState(false);
+  const [publishResult,  setPublishResult]  = useState<string | null>(null);
+  const [publishError,   setPublishError]   = useState<string | null>(null);
+
+  useEffect(() => {
+    const token = getToken();
+    fetch(`${API_BASE}/api/admin/meter-profiles`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => { if (handleAuthError(r, navigate)) throw new Error("auth"); return r.json(); })
+      .then((d) => setProfiles(Array.isArray(d) ? d : d.profiles ?? []))
+      .catch((err) => { if (err?.message !== "auth") setFetchError("Could not load meter profiles."); })
+      .finally(() => setLoading(false));
+  }, [navigate]);
+
+  function openEdit(p: MeterProfile) {
+    setEditId(p.id);
+    setEditModel(p.model);
+    setEditDisplayName(p.display_name);
+    setEditEndianness(p.endianness);
+    setEditBaudRate(p.baud_rate);
+    setEditParity(p.parity);
+    setEditRegisters(p.registers.map((r) => ({ ...r })));
+    setEditError(null);
+  }
+
+  async function saveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/meter-profiles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ model: addModel, display_name: addDisplayName, endianness: addEndianness, baud_rate: addBaudRate, parity: addParity, registers: addRegisters }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Save failed");
+      setProfiles((prev) => [...prev, data as unknown as MeterProfile]);
+      setAddModel(""); setAddDisplayName(""); setAddEndianness("ABCD"); setAddBaudRate(9600); setAddParity("None"); setAddRegisters([BLANK_REGISTER()]);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveEdit() {
+    if (!editId) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/meter-profiles/${editId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ model: editModel, display_name: editDisplayName, endianness: editEndianness, baud_rate: editBaudRate, parity: editParity, registers: editRegisters }),
+      });
+      if (handleAuthError(res, navigate)) return;
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Update failed");
+      setProfiles((prev) => prev.map((p) => p.id === editId ? (data as unknown as MeterProfile) : p));
+      setEditId(null);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function deleteProfile() {
+    if (!deleteId) return;
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/meter-profiles/${deleteId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (handleAuthError(res, navigate)) return;
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+        throw new Error((data.error as string) ?? "Delete failed");
+      }
+      setProfiles((prev) => prev.filter((p) => p.id !== deleteId));
+      setDeleteId(null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  async function publishAll() {
+    setPublishing(true);
+    setPublishResult(null);
+    setPublishError(null);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/meter-profiles/publish`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (handleAuthError(res, navigate)) return;
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Publish failed");
+      setPublishResult(`Published to ${data.node_count ?? "?"} node${Number(data.node_count) !== 1 ? "s" : ""}`);
+    } catch (err) {
+      setPublishError(err instanceof Error ? err.message : "Publish failed");
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  function RegistersBuilder({ regs, onChange }: { regs: MeterRegister[]; onChange: (r: MeterRegister[]) => void }) {
+    function updateReg(i: number, field: keyof MeterRegister, value: string | number) {
+      const next = regs.map((r, idx) => idx === i ? { ...r, [field]: value } : r);
+      onChange(next);
+    }
+    return (
+      <div>
+        <div style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Registers</div>
+        {regs.map((reg, i) => (
+          <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 80px 60px 110px 70px auto", gap: 6, marginBottom: 8, alignItems: "end" }}>
+            <div>
+              {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Name</div>}
+              <input value={reg.name} onChange={(e) => updateReg(i, "name", e.target.value)} placeholder="e.g. voltage_l1" style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }} />
+            </div>
+            <div>
+              {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Address</div>}
+              <input type="number" value={reg.address} onChange={(e) => updateReg(i, "address", Number(e.target.value))} style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }} />
+            </div>
+            <div>
+              {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Len</div>}
+              <select value={reg.length} onChange={(e) => updateReg(i, "length", Number(e.target.value) as 1 | 2)} style={{ width: "100%", padding: "7px 8px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none" }}>
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+              </select>
+            </div>
+            <div>
+              {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Data Type</div>}
+              <select value={reg.data_type} onChange={(e) => updateReg(i, "data_type", e.target.value as MeterRegister["data_type"])} style={{ width: "100%", padding: "7px 8px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none" }}>
+                {(["Float32", "UInt16", "UInt32", "INT16", "INT32"] as const).map((dt) => <option key={dt} value={dt}>{dt}</option>)}
+              </select>
+            </div>
+            <div>
+              {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Mult</div>}
+              <input type="number" step="any" value={reg.multiplier} onChange={(e) => updateReg(i, "multiplier", Number(e.target.value))} style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }} />
+            </div>
+            <div style={{ paddingTop: i === 0 ? 16 : 0 }}>
+              <button type="button" onClick={() => onChange(regs.filter((_, idx) => idx !== i))} style={{ padding: "6px 8px", borderRadius: 6, background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, color: CLR.danger, cursor: "pointer", display: "flex", alignItems: "center" }}>
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </div>
+        ))}
+        <button type="button" onClick={() => onChange([...regs, BLANK_REGISTER()])} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 6, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, fontSize: 12, fontWeight: 600, cursor: "pointer", marginTop: 4 }}>
+          <PlusCircle size={13} /> Add Register
+        </button>
+      </div>
+    );
+  }
+
+  const inputStyle: CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "'Inter',sans-serif" };
+  const selectStyle: CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 13, outline: "none" };
+
+  return (
+    <div className="admin-fade">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+        <div>
+          <h2 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 20, color: CLR.text, letterSpacing: "-0.02em", margin: 0 }}>Meter Profiles</h2>
+          <p style={{ fontSize: 13, color: CLR.muted, marginTop: 4, marginBottom: 0 }}>Define Modbus meter register maps</p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+          <button onClick={publishAll} disabled={publishing} style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 18px", borderRadius: 8, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, fontWeight: 600, fontSize: 13, cursor: publishing ? "not-allowed" : "pointer", opacity: publishing ? 0.65 : 1 }}>
+            {publishing ? <Spinner /> : <><Send size={13} /> Publish All to Nodes</>}
+          </button>
+          {publishResult && <div style={{ fontSize: 12, color: CLR.green, fontWeight: 600 }}>{publishResult}</div>}
+          {publishError  && <div style={{ fontSize: 12, color: CLR.danger }}>{publishError}</div>}
+        </div>
+      </div>
+
+      {fetchError && <div style={{ padding: "10px 14px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13, marginBottom: 20 }}>{fetchError}</div>}
+
+      {/* ── Profile List ────────────────────────────────────────────────────── */}
+      {loading ? (
+        <div style={{ display: "flex", justifyContent: "center", padding: 32 }}><Spinner /></div>
+      ) : profiles.length === 0 ? (
+        <div style={{ ...card({ padding: 28, textAlign: "center", color: CLR.muted, fontSize: 13, marginBottom: 32 }) }}>No meter profiles yet. Add one below.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 32 }}>
+          {profiles.map((p) => (
+            <div key={p.id} style={{ ...card({ padding: 0, overflow: "hidden" }) }}>
+              {/* Summary row */}
+              <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "14px 18px", flexWrap: "wrap" as const }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: CLR.text }}>{p.display_name}</div>
+                  <div style={{ fontSize: 12, color: CLR.muted, fontFamily: "'Share Tech Mono',monospace", marginTop: 2 }}>{p.model}</div>
+                </div>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", flexWrap: "wrap" as const }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, background: "#f8fafc", border: `1px solid ${CLR.border}`, padding: "2px 8px", borderRadius: 5 }}>{p.endianness}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, background: "#f8fafc", border: `1px solid ${CLR.border}`, padding: "2px 8px", borderRadius: 5 }}>{p.baud_rate} baud</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, background: "#f8fafc", border: `1px solid ${CLR.border}`, padding: "2px 8px", borderRadius: 5 }}>{p.parity}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.accent, background: CLR.accentDim, border: "1px solid #bfdbfe", padding: "2px 8px", borderRadius: 5 }}>{p.registers.length} reg{p.registers.length !== 1 ? "s" : ""}</span>
+                  {p.updated_at && <span style={{ fontSize: 11, color: CLR.muted2 }}>Updated {p.updated_at}</span>}
+                  <button onClick={() => openEdit(p)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 6, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, cursor: "pointer" }}>Edit</button>
+                  {deleteId === p.id ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 12, color: CLR.danger }}>Confirm?</span>
+                      {deleteError && <span style={{ fontSize: 11, color: CLR.danger }}>{deleteError}</span>}
+                      <button onClick={deleteProfile} disabled={deleteLoading} style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 5, background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, color: CLR.danger, cursor: deleteLoading ? "not-allowed" : "pointer" }}>
+                        {deleteLoading ? <Spinner /> : "Delete"}
+                      </button>
+                      <button onClick={() => { setDeleteId(null); setDeleteError(null); }} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, cursor: "pointer" }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setDeleteId(p.id)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 6, background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, color: CLR.danger, cursor: "pointer" }}>Delete</button>
+                  )}
+                </div>
+              </div>
+              {/* Inline edit */}
+              {editId === p.id && (
+                <div style={{ borderTop: `1px solid ${CLR.border}`, padding: "20px 18px", background: "#fafcff" }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: CLR.text, marginBottom: 14 }}>Edit Profile</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Model</label>
+                      <input value={editModel} onChange={(e) => setEditModel(e.target.value)} style={inputStyle} onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }} onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Display Name</label>
+                      <input value={editDisplayName} onChange={(e) => setEditDisplayName(e.target.value)} style={inputStyle} onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }} onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Endianness</label>
+                      <select value={editEndianness} onChange={(e) => setEditEndianness(e.target.value as MeterProfile["endianness"])} style={selectStyle}>
+                        {(["ABCD", "CDAB", "BADC", "DCBA"] as const).map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Baud Rate</label>
+                      <input type="number" value={editBaudRate} onChange={(e) => setEditBaudRate(Number(e.target.value))} style={inputStyle} onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }} onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Parity</label>
+                      <select value={editParity} onChange={(e) => setEditParity(e.target.value as MeterProfile["parity"])} style={selectStyle}>
+                        {(["None", "Even", "Odd"] as const).map((v) => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ marginBottom: 14 }}>
+                    <RegistersBuilder regs={editRegisters} onChange={setEditRegisters} />
+                  </div>
+                  {editError && <div style={{ padding: "9px 12px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13, marginBottom: 14 }}>{editError}</div>}
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <button onClick={saveEdit} disabled={editSaving} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 18px", borderRadius: 8, background: CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 13, cursor: editSaving ? "not-allowed" : "pointer", opacity: editSaving ? 0.65 : 1 }}>
+                      {editSaving ? <Spinner /> : <><Check size={13} /> Save Changes</>}
+                    </button>
+                    <button onClick={() => setEditId(null)} style={{ padding: "9px 16px", borderRadius: 8, background: "#fff", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Add Profile Form ─────────────────────────────────────────────────── */}
+      <div style={{ ...card({ padding: 28 }), maxWidth: 700 }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: CLR.text, marginBottom: 16, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>Add Profile</div>
+        <form onSubmit={saveProfile} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Model</label>
+              <input value={addModel} onChange={(e) => setAddModel(e.target.value)} required placeholder="e.g. schneider_pm2220" style={inputStyle} onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }} onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Display Name</label>
+              <input value={addDisplayName} onChange={(e) => setAddDisplayName(e.target.value)} required placeholder="e.g. Schneider PM2220" style={inputStyle} onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }} onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Endianness</label>
+              <select value={addEndianness} onChange={(e) => setAddEndianness(e.target.value as MeterProfile["endianness"])} style={selectStyle}>
+                {(["ABCD", "CDAB", "BADC", "DCBA"] as const).map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Baud Rate</label>
+              <input type="number" value={addBaudRate} onChange={(e) => setAddBaudRate(Number(e.target.value))} required style={inputStyle} onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }} onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }} />
+            </div>
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>Parity</label>
+              <select value={addParity} onChange={(e) => setAddParity(e.target.value as MeterProfile["parity"])} style={selectStyle}>
+                {(["None", "Even", "Odd"] as const).map((v) => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+          </div>
+          <RegistersBuilder regs={addRegisters} onChange={setAddRegisters} />
+          {saveError && <div style={{ padding: "10px 14px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{saveError}</div>}
+          <button type="submit" disabled={saving} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px", borderRadius: 8, background: saving ? "rgba(37,99,235,0.55)" : CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 15, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1, boxShadow: "0 4px 16px rgba(37,99,235,0.25)" }}>
+            {saving ? <Spinner /> : <><Check size={14} /> Save Profile</>}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main AdminDashboard ──────────────────────────────────────────────────────
-type Tab = "fleet" | "clients" | "create" | "online-projects" | "licenses";
+type Tab = "fleet" | "clients" | "create" | "online-projects" | "licenses" | "meter-profiles";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "fleet",           label: "Global Fleet",      icon: <Globe size={15} />    },
@@ -1918,6 +2480,7 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: "create",          label: "Create User",       icon: <UserPlus size={15} /> },
   { id: "online-projects", label: "Online Projects",   icon: <Zap size={15} />      },
   { id: "licenses",        label: "Offline Licenses",  icon: <Key size={15} />      },
+  { id: "meter-profiles",  label: "Meter Profiles",    icon: <Cpu size={15} />      },
 ];
 
 export default function AdminDashboard() {
@@ -2020,6 +2583,7 @@ export default function AdminDashboard() {
           {tab === "create"          && <CreateUserTab />}
           {tab === "online-projects" && <OnlineProjectsTab />}
           {tab === "licenses"        && <LicenseTab />}
+          {tab === "meter-profiles"  && <MeterProfilesTab />}
         </main>
       </div>
     </>
