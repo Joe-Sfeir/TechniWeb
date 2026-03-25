@@ -12,7 +12,7 @@ import { API_URL } from "../config";
 
 const MAX_HISTORY   = 120;
 const SPARK_HISTORY = 20;
-const POLL_MS       = 3000;
+const POLL_MS       = 2000;
 
 // Keys in a telemetry row that are NOT variables
 const NON_VAR = new Set(["timestamp", "device_name", "id", "project_id", "created_at", "updated_at"]);
@@ -125,6 +125,13 @@ interface BusDeviceConfig {
   ip_address: string;
   tcp_port: number;
   registers: BusRegisterEntry[];
+}
+
+interface NodeStatus {
+  machine_id: string;
+  node_name?: string;
+  polling_state: "running" | "stopped" | "fault";
+  last_seen?: string;
 }
 
 // ─── Demo data (offline fallback) ─────────────────────────────────────────────
@@ -389,6 +396,7 @@ export default function ProjectView() {
   const [exporting,   setExporting]   = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [fetchError,  setFetchError]  = useState<string | null>(null);
+  const [nodeStatuses, setNodeStatuses] = useState<NodeStatus[]>([]);
 
   // ── Bus Config modal ──
   const [busCfgOpen,      setBusCfgOpen]      = useState(false);
@@ -518,10 +526,11 @@ export default function ProjectView() {
         if (handleAuthError(r, navigate)) return;
         if (r.status === 403) { navigate(backTo); return; }
         if (!r.ok) { setFetchError(`Server error (${r.status}) — contact support.`); return; }
-        const data = await r.json() as { project_name?: string; rows: TelemetryRow[]; thresholds?: ThresholdMap } | TelemetryRow[];
+        const data = await r.json() as { project_name?: string; rows: TelemetryRow[]; thresholds?: ThresholdMap; nodes?: NodeStatus[] } | TelemetryRow[];
         const rows = Array.isArray(data) ? data : (data.rows ?? []);
         if (!Array.isArray(data) && data.project_name) setProjectName(data.project_name);
         if (!Array.isArray(data) && data.thresholds) setThresholds(data.thresholds);
+        if (!Array.isArray(data) && data.nodes) setNodeStatuses(data.nodes);
         processRows(rows, true);
       } catch {
         processRows(DEMO_ROWS, true);
@@ -543,9 +552,10 @@ export default function ProjectView() {
         const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
         if (handleAuthError(r, navigate)) return;
         if (!r.ok) return;
-        const data = await r.json() as { rows?: TelemetryRow[]; thresholds?: ThresholdMap } | TelemetryRow[];
+        const data = await r.json() as { rows?: TelemetryRow[]; thresholds?: ThresholdMap; nodes?: NodeStatus[] } | TelemetryRow[];
         const rows = Array.isArray(data) ? data : (data.rows ?? []);
         if (!Array.isArray(data) && data.thresholds) setThresholds(data.thresholds);
+        if (!Array.isArray(data) && data.nodes) setNodeStatuses(data.nodes);
         if (rows.length > 0) processRows(rows, false);
         else setLastPollMs(Date.now());
       } catch { /* silent for transient network failures */ }
@@ -574,7 +584,7 @@ export default function ProjectView() {
   }, [projectId, navigate]);
 
   // ── Bus Config helpers ──
-  const loadNodeConfig = useCallback(async (machineId: string) => {
+  const loadNodeConfig = useCallback(async (machineId: string, profiles: MeterProfileLight[]) => {
     if (!projectId) return;
     setBusCfgMachineId(machineId);
     setBusCfgLoading(true);
@@ -584,8 +594,30 @@ export default function ProjectView() {
       const r = await fetch(`${API_URL}/api/projects/${projectId}/config/${machineId}`, { headers: { Authorization: `Bearer ${token}` } });
       if (handleAuthError(r, navigate)) return;
       if (r.status === 404) { setBusCfgDevices([]); setBusCfgLoading(false); return; }
-      const data = await r.json() as { devices?: BusDeviceConfig[] };
-      setBusCfgDevices((data.devices ?? []).map((d) => ({ ...d, registers: d.registers ?? [] })));
+      const data = await r.json() as { devices?: Array<Omit<BusDeviceConfig, "registers"> & { registers?: Array<{ name: string; alarm_min?: string | number | null; alarm_max?: string | number | null }> }> };
+      const mapped: BusDeviceConfig[] = (data.devices ?? []).map((d) => {
+        const savedRegs = d.registers ?? [];
+        const savedMap = new Map(savedRegs.map((r) => [r.name, r]));
+        const profile = profiles.find((p) => p.model === d.meter_model);
+        const registers: BusRegisterEntry[] = profile
+          ? profile.registers.map((r) => {
+              const saved = savedMap.get(r.name);
+              return {
+                name: r.name,
+                selected: savedMap.has(r.name),
+                alarm_min: saved?.alarm_min != null ? String(saved.alarm_min) : "",
+                alarm_max: saved?.alarm_max != null ? String(saved.alarm_max) : "",
+              };
+            })
+          : savedRegs.map((r) => ({
+              name: r.name,
+              selected: true,
+              alarm_min: r.alarm_min != null ? String(r.alarm_min) : "",
+              alarm_max: r.alarm_max != null ? String(r.alarm_max) : "",
+            }));
+        return { ...d, registers };
+      });
+      setBusCfgDevices(mapped);
     } catch {
       setBusCfgError("Could not load node configuration.");
     } finally {
@@ -610,14 +642,18 @@ export default function ProjectView() {
       ]);
       if (handleAuthError(profilesRes, navigate)) return;
       if (handleAuthError(nodesRes, navigate)) return;
-      const profilesData = await profilesRes.json() as MeterProfileLight[] | { profiles?: MeterProfileLight[] };
-      setBusCfgProfiles(Array.isArray(profilesData) ? profilesData : (profilesData.profiles ?? []));
+      let freshProfiles: MeterProfileLight[] = [];
+      if (profilesRes.ok) {
+        const raw = await profilesRes.json();
+        freshProfiles = Array.isArray(raw) ? raw : (raw.profiles ?? raw.meter_profiles ?? raw.data ?? []);
+      }
+      setBusCfgProfiles(freshProfiles);
       const nodesData = await nodesRes.json() as { nodes?: { machine_id: string; node_name: string }[]; protocols?: string };
       const nodes = nodesData.nodes ?? [];
       setBusCfgNodes(nodes);
       setBusCfgProtocols(nodesData.protocols ?? "All");
       if (nodes.length === 1) {
-        await loadNodeConfig(nodes[0].machine_id);
+        await loadNodeConfig(nodes[0].machine_id, freshProfiles);
       } else {
         setBusCfgLoading(false);
       }
@@ -736,6 +772,10 @@ export default function ProjectView() {
   const isVeryStale  = dataAge > 5 * 60_000;
   const staleMinutes = Math.floor(dataAge / 60_000);
 
+  const hasStopped  = isLive && nodeStatuses.some((n) => n.polling_state === "stopped");
+  const hasFault    = isLive && !hasStopped && nodeStatuses.some((n) => n.polling_state === "fault");
+  const stoppedNode = nodeStatuses.find((n) => n.polling_state === "stopped");
+
   const inactiveDeviceSet = useMemo(() =>
     new Set(devices.filter((d) => (deviceMissedPolls[d] ?? 0) >= 2)),
   [devices, deviceMissedPolls]);
@@ -810,11 +850,15 @@ export default function ProjectView() {
 
           <div style={{ width: "1px", height: "28px", background: CLR.border(isDark) }} />
 
-          {/* Live / Stale / Offline / Demo status */}
+          {/* Live / Stopped / Fault / Stale / Offline / Demo status */}
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: !isLive ? CLR.amber : isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green, boxShadow: isLive && !isStale ? `0 0 8px ${CLR.green}` : "none", animation: isLive && !isStale ? "pulse-dot 2s ease-in-out infinite" : "none" }} />
-            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.12em", fontWeight: 600, color: !isLive ? CLR.amber : isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green }}>
-              {!isLive ? "DEMO" : isVeryStale ? "OFFLINE" : isStale ? "STALE" : "LIVE"}
+            <div style={{ width: "8px", height: "8px", borderRadius: "50%",
+              background: !isLive ? CLR.amber : hasStopped ? CLR.red : hasFault ? CLR.amber : isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green,
+              boxShadow: isLive && !hasStopped && !hasFault && !isStale ? `0 0 8px ${CLR.green}` : "none",
+              animation: isLive && !hasStopped && !hasFault && !isStale ? "pulse-dot 2s ease-in-out infinite" : "none" }} />
+            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.12em", fontWeight: 600,
+              color: !isLive ? CLR.amber : hasStopped ? CLR.red : hasFault ? CLR.amber : isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green }}>
+              {!isLive ? "DEMO" : hasStopped ? "STOPPED" : hasFault ? "FAULT" : isVeryStale ? "OFFLINE" : isStale ? "STALE" : "LIVE"}
             </span>
           </div>
 
@@ -853,7 +897,21 @@ export default function ProjectView() {
         </div>
       </header>
 
-      {/* ══ Polling-stopped banner ══ */}
+      {/* ══ Node polling-state banners (immediate, from API) ══ */}
+      {hasStopped && (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 20px", flexShrink: 0, background: CLR.red + "22", borderBottom: `2px solid ${CLR.red}55`, color: CLR.red, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.7rem", letterSpacing: "0.08em", fontWeight: 700 }}>
+          <span style={{ fontSize: "1rem", lineHeight: 1 }}>⚠</span>
+          <span>POLLING STOPPED — The monitoring device has stopped data collection{stoppedNode?.last_seen ? ` · last seen ${new Date(stoppedNode.last_seen).toLocaleTimeString("en-GB", { hour12: false })}` : ""}</span>
+        </div>
+      )}
+      {hasFault && (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 20px", flexShrink: 0, background: CLR.amber + "1a", borderBottom: `2px solid ${CLR.amber}44`, color: CLR.amber, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.7rem", letterSpacing: "0.08em", fontWeight: 700 }}>
+          <span style={{ fontSize: "1rem", lineHeight: 1 }}>⚠</span>
+          <span>DEVICE FAULT — The monitoring device has encountered an error</span>
+        </div>
+      )}
+
+      {/* ══ Stale-time banners (fallback when nodes not in response) ══ */}
       {isVeryStale && (
         <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 20px", flexShrink: 0, background: CLR.red + "18", borderBottom: `1px solid ${CLR.red}44`, color: CLR.red, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.08em" }}>
           <span>⚠</span>
@@ -981,7 +1039,7 @@ export default function ProjectView() {
                   <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Select Node</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {busCfgNodes.map((node) => (
-                      <button key={node.machine_id} onClick={() => loadNodeConfig(node.machine_id)}
+                      <button key={node.machine_id} onClick={() => loadNodeConfig(node.machine_id, busCfgProfiles)}
                         style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "12px 16px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", textAlign: "left" }}>
                         <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>{node.node_name || node.machine_id}</span>
                         <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: "#64748b", marginTop: 2 }}>{node.machine_id}</span>
