@@ -1,1 +1,1 @@
-export const API_URL = import.meta.env.VITE_API_BASE ?? "https://technicloudapi.onrender.com";
+export const API_URL = import.meta.env.VITE_API_BASE ?? "https://technicloudapi-production.up.railway.app";
