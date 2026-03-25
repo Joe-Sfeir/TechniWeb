@@ -1,7 +1,7 @@
 import { useState, useEffect, Fragment } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus, Search, Send, Cpu, PlusCircle, Trash2 } from "lucide-react";
+import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus, Search, Send, Cpu, PlusCircle, Trash2, Upload } from "lucide-react";
 import { getToken, getRole, clearAuth, handleAuthError } from "../lib/auth";
 
 import { API_URL } from "../config";
@@ -2188,6 +2188,14 @@ function MeterProfilesTab() {
   const [publishResult,  setPublishResult]  = useState<string | null>(null);
   const [publishError,   setPublishError]   = useState<string | null>(null);
 
+  // json import
+  const [importMode,    setImportMode]    = useState<"none" | "paste" | "file">("none");
+  const [importJson,    setImportJson]    = useState("");
+  const [importParsed,  setImportParsed]  = useState<Omit<MeterProfile, "id" | "updated_at"> | null>(null);
+  const [importError,   setImportError]   = useState<string | null>(null);
+  const [importSaving,  setImportSaving]  = useState(false);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     const token = getToken();
     fetch(`${API_BASE}/api/admin/meter-profiles`, { headers: { Authorization: `Bearer ${token}` } })
@@ -2296,6 +2304,70 @@ function MeterProfilesTab() {
       setPublishError(err instanceof Error ? err.message : "Publish failed");
     } finally {
       setPublishing(false);
+    }
+  }
+
+  function validateAndSetImport(text: string) {
+    setImportJson(text);
+    setImportSuccess(null);
+    if (!text.trim()) { setImportParsed(null); setImportError(null); return; }
+    try {
+      const raw = JSON.parse(text) as Record<string, unknown>;
+      if (typeof raw.model !== "string" || !raw.model.trim()) throw new Error("\"model\" must be a non-empty string");
+      if (typeof raw.display_name !== "string" || !raw.display_name.trim()) throw new Error("\"display_name\" must be a non-empty string");
+      if (!Array.isArray(raw.registers) || raw.registers.length === 0) throw new Error("\"registers\" must be a non-empty array");
+      const validTypes = ["Float32", "UInt16", "UInt32", "INT16", "INT32"];
+      (raw.registers as Record<string, unknown>[]).forEach((r, i) => {
+        if (typeof r.name !== "string" || !r.name.trim()) throw new Error(`registers[${i}].name must be a non-empty string`);
+        if (typeof r.address !== "number") throw new Error(`registers[${i}].address must be a number`);
+        if (r.data_type && !validTypes.includes(r.data_type as string)) throw new Error(`registers[${i}].data_type must be one of: ${validTypes.join(", ")}`);
+      });
+      setImportParsed({
+        model: (raw.model as string).trim(),
+        display_name: (raw.display_name as string).trim(),
+        endianness: (["ABCD","CDAB","BADC","DCBA"].includes(raw.endianness as string) ? raw.endianness : "ABCD") as MeterProfile["endianness"],
+        baud_rate: typeof raw.baud_rate === "number" ? raw.baud_rate : 9600,
+        parity: (["None","Even","Odd"].includes(raw.parity as string) ? raw.parity : "None") as MeterProfile["parity"],
+        registers: (raw.registers as Record<string, unknown>[]).map((r) => ({
+          name: (r.name as string).trim(),
+          address: r.address as number,
+          length: ([1,2].includes(r.length as number) ? r.length : 1) as 1 | 2,
+          data_type: (validTypes.includes(r.data_type as string) ? r.data_type : "Float32") as MeterRegister["data_type"],
+          multiplier: typeof r.multiplier === "number" ? r.multiplier : 1,
+        })),
+      });
+      setImportError(null);
+    } catch (err) {
+      setImportParsed(null);
+      setImportError(err instanceof Error ? err.message : "Invalid JSON");
+    }
+  }
+
+  async function saveImport() {
+    if (!importParsed) return;
+    setImportSaving(true);
+    setImportError(null);
+    setImportSuccess(null);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/meter-profiles`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(importParsed),
+      });
+      if (handleAuthError(res, navigate)) return;
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (res.status === 409) throw new Error("A profile with this model ID already exists");
+      if (!res.ok) throw new Error((data.error as string) ?? "Save failed");
+      setProfiles((prev) => [...prev, data as unknown as MeterProfile]);
+      setImportSuccess(`"${importParsed.display_name}" imported successfully`);
+      setImportMode("none");
+      setImportJson("");
+      setImportParsed(null);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setImportSaving(false);
     }
   }
 
@@ -2451,6 +2523,87 @@ function MeterProfilesTab() {
           ))}
         </div>
       )}
+
+      {/* ── Import from JSON ─────────────────────────────────────────────────── */}
+      <div style={{ ...card({ padding: 28 }), maxWidth: 700, marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: importMode === "none" ? 0 : 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 15, color: CLR.text, fontFamily: "'Plus Jakarta Sans','Inter',sans-serif" }}>Import from JSON</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {importMode !== "paste" && (
+              <button type="button" onClick={() => { setImportMode("paste"); setImportJson(""); setImportParsed(null); setImportError(null); setImportSuccess(null); }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 7, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                Paste JSON
+              </button>
+            )}
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 7, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              <Upload size={12} /> Upload .json
+              <input type="file" accept=".json,application/json" style={{ display: "none" }} onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                e.target.value = "";
+                setImportMode("file");
+                setImportSuccess(null);
+                const reader = new FileReader();
+                reader.onload = (ev) => validateAndSetImport((ev.target?.result as string) ?? "");
+                reader.readAsText(file);
+              }} />
+            </label>
+            {importMode !== "none" && (
+              <button type="button" onClick={() => { setImportMode("none"); setImportJson(""); setImportParsed(null); setImportError(null); setImportSuccess(null); }}
+                style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "7px 10px", borderRadius: 7, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 12, cursor: "pointer" }}>
+                <X size={12} /> Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        {importMode === "paste" && (
+          <textarea
+            value={importJson}
+            onChange={(e) => validateAndSetImport(e.target.value)}
+            placeholder={`{\n  "model": "schneider_pm2220",\n  "display_name": "Schneider PM2220",\n  "endianness": "ABCD",\n  "baud_rate": 9600,\n  "parity": "None",\n  "registers": [\n    { "name": "voltage_l1", "address": 3000, "length": 2, "data_type": "Float32", "multiplier": 1 }\n  ]\n}`}
+            style={{ width: "100%", minHeight: 180, padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, fontFamily: "'Share Tech Mono',monospace", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+            onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
+            onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }}
+          />
+        )}
+
+        {importParsed && (
+          <div style={{ marginTop: 14, padding: "14px 16px", borderRadius: 8, background: "#f0fdf4", border: "1px solid #bbf7d0" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#16a34a", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 }}>Preview</div>
+            <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 8 }}>
+              <div><span style={{ fontSize: 11, color: CLR.muted, fontWeight: 600 }}>Display Name </span><span style={{ fontSize: 13, fontWeight: 700, color: CLR.text }}>{importParsed.display_name}</span></div>
+              <div><span style={{ fontSize: 11, color: CLR.muted, fontWeight: 600 }}>Model </span><span style={{ fontSize: 12, color: CLR.text, fontFamily: "'Share Tech Mono',monospace" }}>{importParsed.model}</span></div>
+              <div><span style={{ fontSize: 11, color: CLR.muted, fontWeight: 600 }}>Registers </span><span style={{ fontSize: 13, fontWeight: 700, color: CLR.accent }}>{importParsed.registers.length}</span></div>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {importParsed.registers.map((r, i) => (
+                <span key={i} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 4, background: "#dcfce7", border: "1px solid #86efac", color: "#15803d", fontFamily: "'Share Tech Mono',monospace" }}>{r.name}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {importError && (
+          <div style={{ marginTop: 12, padding: "9px 12px", background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, borderRadius: 8, color: CLR.danger, fontSize: 13 }}>{importError}</div>
+        )}
+        {importSuccess && (
+          <div style={{ marginTop: 12, padding: "9px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, color: "#16a34a", fontSize: 13, fontWeight: 600 }}>{importSuccess}</div>
+        )}
+
+        {importParsed && !importSuccess && (
+          <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+            <button type="button" onClick={saveImport} disabled={importSaving}
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "10px 20px", borderRadius: 8, background: importSaving ? "rgba(37,99,235,0.55)" : CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 13, cursor: importSaving ? "not-allowed" : "pointer", boxShadow: "0 4px 16px rgba(37,99,235,0.2)" }}>
+              {importSaving ? <Spinner /> : <><Check size={13} /> Confirm &amp; Save</>}
+            </button>
+            <button type="button" onClick={() => { setImportParsed(null); setImportJson(""); setImportMode("none"); setImportError(null); }}
+              style={{ padding: "10px 16px", borderRadius: 8, background: "#fff", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* ── Add Profile Form ─────────────────────────────────────────────────── */}
       <div style={{ ...card({ padding: 28 }), maxWidth: 700 }}>

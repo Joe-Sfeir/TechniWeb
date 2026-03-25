@@ -598,7 +598,7 @@ export default function ProjectView() {
       const mapped: BusDeviceConfig[] = (data.devices ?? []).map((d) => {
         const savedRegs = d.registers ?? [];
         const savedMap = new Map(savedRegs.map((r) => [r.name, r]));
-        const profile = profiles.find((p) => p.model === d.meter_model);
+        const profile = profiles.find((p) => p.model.toLowerCase() === d.meter_model.toLowerCase());
         const registers: BusRegisterEntry[] = profile
           ? profile.registers.map((r) => {
               const saved = savedMap.get(r.name);
@@ -680,7 +680,7 @@ export default function ProjectView() {
       if (i !== idx) return d;
       const updated = { ...d, ...patch };
       if (patch.meter_model !== undefined && patch.meter_model !== d.meter_model) {
-        const profile = busCfgProfiles.find((p) => p.model === patch.meter_model);
+        const profile = busCfgProfiles.find((p) => p.model.toLowerCase() === (patch.meter_model ?? "").toLowerCase());
         updated.registers = profile
           ? profile.registers.map((r) => ({ name: r.name, selected: false, alarm_min: "", alarm_max: "" }))
           : [];
