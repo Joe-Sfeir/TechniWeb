@@ -1066,6 +1066,9 @@ function OnlineProjectsTab() {
   // node toggle
   const [nodeToggleLoading, setNodeToggleLoading] = useState<Record<string, boolean>>({});
 
+  // custom meter profiles (for merged meter options)
+  const [customProfiles, setCustomProfiles] = useState<MeterProfile[]>([]);
+
   // push config modal
   const [pushCfgProjectId,  setPushCfgProjectId]  = useState<string | null>(null);
   const [pushCfgMachineId,  setPushCfgMachineId]  = useState<string | null>(null);
@@ -1083,6 +1086,10 @@ function OnlineProjectsTab() {
       .then((d) => setProjects(Array.isArray(d) ? d : d.projects ?? []))
       .catch((err) => { if (err?.message !== "auth") setFetchError("Could not load online projects."); })
       .finally(() => setLoading(false));
+    fetch(`${API_BASE}/api/admin/meter-profiles`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => { if (handleAuthError(r, navigate)) throw new Error("auth"); return r.json(); })
+      .then((d) => setCustomProfiles(Array.isArray(d) ? d : d.profiles ?? []))
+      .catch(() => { /* non-critical */ });
   }, [navigate]);
 
   function openPushConfig(projectId: string, machineId: string, allowedMeters: string[]) {
@@ -1332,6 +1339,11 @@ function OnlineProjectsTab() {
   const deleteProject_ = projects.find((p) => p.id === deleteId);
   const renewProject_  = projects.find((p) => p.id === renewId);
 
+  const mergedOnlineMeterOptions = [
+    ...ONLINE_METER_OPTIONS,
+    ...customProfiles.map((p) => ({ id: p.model, label: p.display_name })),
+  ];
+
   return (
     <div className="admin-fade">
       {/* ── Renew Modal ─────────────────────────────────────────────────────── */}
@@ -1410,7 +1422,7 @@ function OnlineProjectsTab() {
                         >
                           {checked && <Check size={10} color={CLR.accent} />}
                         </div>
-                        <span style={{ fontSize: 13, color: checked ? CLR.text : CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{reg}</span>
+                        <span style={{ fontSize: 13, color: checked ? CLR.text : CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{mergedOnlineMeterOptions.find((o) => o.id === reg)?.label ?? reg}</span>
                       </label>
                       {checked && (
                         <div style={{ display: "flex", gap: 8, marginLeft: 27 }}>
@@ -1538,7 +1550,7 @@ function OnlineProjectsTab() {
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {ONLINE_METER_OPTIONS.map((opt) => (
+              {mergedOnlineMeterOptions.map((opt) => (
                 <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                   <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                     {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
@@ -1690,7 +1702,7 @@ function OnlineProjectsTab() {
                       <div style={{ marginBottom: 14 }}>
                         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                          {ONLINE_METER_OPTIONS.map((opt) => (
+                          {mergedOnlineMeterOptions.map((opt) => (
                             <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                               <div onClick={() => toggleEditMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${editMeters.includes(opt.id) ? CLR.accent : CLR.border}`, background: editMeters.includes(opt.id) ? CLR.accentDim : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                                 {editMeters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
@@ -1875,6 +1887,7 @@ function LicenseTab() {
     catch { return new Set<string>(); }
   });
   const [showHidden,     setShowHidden]     = useState(false);
+  const [customProfiles, setCustomProfiles] = useState<MeterProfile[]>([]);
 
   useEffect(() => {
     const token = getToken();
@@ -1890,6 +1903,10 @@ function LicenseTab() {
         setHistoryLoading(false);
       }
     })();
+    fetch(`${API_BASE}/api/admin/meter-profiles`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => { if (handleAuthError(r, navigate)) throw new Error("auth"); return r.json(); })
+      .then((d) => setCustomProfiles(Array.isArray(d) ? d : d.profiles ?? []))
+      .catch(() => { /* non-critical */ });
   }, [navigate]);
 
   function toggleMeter(id: string) {
@@ -1955,6 +1972,11 @@ function LicenseTab() {
     color: active ? (color ?? CLR.accent) : CLR.muted,
   });
 
+  const mergedLicenseMeterOptions = [
+    ...METER_OPTIONS,
+    ...customProfiles.map((p) => ({ id: p.model, label: p.display_name })),
+  ];
+
   return (
     <div className="admin-fade">
       <SectionHeader title="Offline Licenses" sub="Generate TechniDAQ offline client licenses" />
@@ -1994,7 +2016,7 @@ function LicenseTab() {
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {METER_OPTIONS.map((opt) => (
+              {mergedLicenseMeterOptions.map((opt) => (
                 <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                   <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                     {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}

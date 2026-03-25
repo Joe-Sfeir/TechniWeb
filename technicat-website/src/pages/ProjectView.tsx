@@ -4,7 +4,7 @@ import {
   ResponsiveContainer, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
-import { ChevronLeft, Sun, Moon, LogOut, Download } from "lucide-react";
+import { ChevronLeft, Sun, Moon, LogOut, Download, Settings, X, Plus, Trash2, Check } from "lucide-react";
 import { getToken, handleAuthError } from "../lib/auth";
 import { API_URL } from "../config";
 
@@ -99,6 +99,33 @@ type ChartPoint    = Record<string, string | number>;
 type Theme         = "dark" | "light";
 type ViewMode      = "chart" | "grid";
 type ThresholdMap  = Record<string, Record<string, { min: number | null; max: number | null }>>;
+
+interface MeterProfileLight {
+  id: string;
+  model: string;
+  display_name: string;
+  registers: { name: string }[];
+}
+
+interface BusRegisterEntry {
+  name: string;
+  selected: boolean;
+  alarm_min: string;
+  alarm_max: string;
+}
+
+interface BusDeviceConfig {
+  device_name: string;
+  meter_model: string;
+  slave_id: number;
+  poll_rate_ms: number;
+  protocol: "rtu" | "tcp";
+  com_port: string;
+  baud_rate: number;
+  ip_address: string;
+  tcp_port: number;
+  registers: BusRegisterEntry[];
+}
 
 // ─── Demo data (offline fallback) ─────────────────────────────────────────────
 
@@ -363,6 +390,18 @@ export default function ProjectView() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [fetchError,  setFetchError]  = useState<string | null>(null);
 
+  // ── Bus Config modal ──
+  const [busCfgOpen,      setBusCfgOpen]      = useState(false);
+  const [busCfgNodes,     setBusCfgNodes]     = useState<{ machine_id: string; node_name: string }[]>([]);
+  const [busCfgMachineId, setBusCfgMachineId] = useState<string | null>(null);
+  const [busCfgProtocols, setBusCfgProtocols] = useState<string>("All");
+  const [busCfgProfiles,  setBusCfgProfiles]  = useState<MeterProfileLight[]>([]);
+  const [busCfgDevices,   setBusCfgDevices]   = useState<BusDeviceConfig[]>([]);
+  const [busCfgLoading,   setBusCfgLoading]   = useState(false);
+  const [busCfgSaving,    setBusCfgSaving]    = useState(false);
+  const [busCfgError,     setBusCfgError]     = useState<string | null>(null);
+  const [busCfgSuccess,   setBusCfgSuccess]   = useState<string | null>(null);
+
   const lastTimestampRef = useRef<string | null>(null);
   const devicesRef       = useRef<string[]>([]);
   const isDark           = theme === "dark";
@@ -534,6 +573,146 @@ export default function ProjectView() {
     } finally { setExporting(false); }
   }, [projectId, navigate]);
 
+  // ── Bus Config helpers ──
+  const loadNodeConfig = useCallback(async (machineId: string) => {
+    if (!projectId) return;
+    setBusCfgMachineId(machineId);
+    setBusCfgLoading(true);
+    setBusCfgError(null);
+    try {
+      const token = getToken();
+      const r = await fetch(`${API_URL}/api/projects/${projectId}/config/${machineId}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (handleAuthError(r, navigate)) return;
+      if (r.status === 404) { setBusCfgDevices([]); setBusCfgLoading(false); return; }
+      const data = await r.json() as { devices?: BusDeviceConfig[] };
+      setBusCfgDevices((data.devices ?? []).map((d) => ({ ...d, registers: d.registers ?? [] })));
+    } catch {
+      setBusCfgError("Could not load node configuration.");
+    } finally {
+      setBusCfgLoading(false);
+    }
+  }, [projectId, navigate]);
+
+  const openBusCfg = useCallback(async () => {
+    if (!projectId) return;
+    setBusCfgOpen(true);
+    setBusCfgLoading(true);
+    setBusCfgError(null);
+    setBusCfgSuccess(null);
+    setBusCfgMachineId(null);
+    setBusCfgNodes([]);
+    setBusCfgDevices([]);
+    try {
+      const token = getToken();
+      const [profilesRes, nodesRes] = await Promise.all([
+        fetch(`${API_URL}/api/meter-profiles`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_URL}/api/projects/${projectId}/nodes`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      if (handleAuthError(profilesRes, navigate)) return;
+      if (handleAuthError(nodesRes, navigate)) return;
+      const profilesData = await profilesRes.json() as MeterProfileLight[] | { profiles?: MeterProfileLight[] };
+      setBusCfgProfiles(Array.isArray(profilesData) ? profilesData : (profilesData.profiles ?? []));
+      const nodesData = await nodesRes.json() as { nodes?: { machine_id: string; node_name: string }[]; protocols?: string };
+      const nodes = nodesData.nodes ?? [];
+      setBusCfgNodes(nodes);
+      setBusCfgProtocols(nodesData.protocols ?? "All");
+      if (nodes.length === 1) {
+        await loadNodeConfig(nodes[0].machine_id);
+      } else {
+        setBusCfgLoading(false);
+      }
+    } catch {
+      setBusCfgError("Could not load configuration.");
+      setBusCfgLoading(false);
+    }
+  }, [projectId, navigate, loadNodeConfig]);
+
+  function addBusCfgDevice() {
+    setBusCfgDevices((prev) => [...prev, {
+      device_name: "", meter_model: "", slave_id: 1, poll_rate_ms: 5000,
+      protocol: "rtu", com_port: "", baud_rate: 9600, ip_address: "", tcp_port: 502,
+      registers: [],
+    }]);
+  }
+
+  function removeBusCfgDevice(idx: number) {
+    setBusCfgDevices((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function updateBusCfgDevice(idx: number, patch: Partial<BusDeviceConfig>) {
+    setBusCfgDevices((prev) => prev.map((d, i) => {
+      if (i !== idx) return d;
+      const updated = { ...d, ...patch };
+      if (patch.meter_model !== undefined && patch.meter_model !== d.meter_model) {
+        const profile = busCfgProfiles.find((p) => p.model === patch.meter_model);
+        updated.registers = profile
+          ? profile.registers.map((r) => ({ name: r.name, selected: false, alarm_min: "", alarm_max: "" }))
+          : [];
+      }
+      return updated;
+    }));
+  }
+
+  function toggleBusCfgRegister(devIdx: number, regIdx: number) {
+    setBusCfgDevices((prev) => prev.map((d, i) => {
+      if (i !== devIdx) return d;
+      return { ...d, registers: d.registers.map((r, j) => j === regIdx ? { ...r, selected: !r.selected } : r) };
+    }));
+  }
+
+  function updateBusCfgRegisterAlarm(devIdx: number, regIdx: number, field: "alarm_min" | "alarm_max", value: string) {
+    setBusCfgDevices((prev) => prev.map((d, i) => {
+      if (i !== devIdx) return d;
+      return { ...d, registers: d.registers.map((r, j) => j === regIdx ? { ...r, [field]: value } : r) };
+    }));
+  }
+
+  const saveBusCfg = useCallback(async () => {
+    if (!projectId || !busCfgMachineId) return;
+    setBusCfgSaving(true);
+    setBusCfgError(null);
+    setBusCfgSuccess(null);
+    try {
+      const token = getToken();
+      const payload = {
+        machine_id: busCfgMachineId,
+        config: {
+          devices: busCfgDevices.map((d) => ({
+            device_name: d.device_name,
+            meter_model: d.meter_model,
+            slave_id: d.slave_id,
+            poll_rate_ms: d.poll_rate_ms,
+            protocol: d.protocol,
+            com_port: d.com_port,
+            baud_rate: d.baud_rate,
+            ip_address: d.ip_address,
+            tcp_port: d.tcp_port,
+            registers: d.registers
+              .filter((r) => r.selected)
+              .map((r) => ({
+                name: r.name,
+                alarm_min: r.alarm_min !== "" ? Number(r.alarm_min) : null,
+                alarm_max: r.alarm_max !== "" ? Number(r.alarm_max) : null,
+              })),
+          })),
+        },
+      };
+      const res = await fetch(`${API_URL}/api/projects/${projectId}/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
+      });
+      if (handleAuthError(res, navigate)) return;
+      const data = await res.json().catch(() => ({})) as Record<string, unknown>;
+      if (!res.ok) throw new Error((data.error as string) ?? "Deploy failed");
+      setBusCfgSuccess("Configuration sent — will be applied on next sync cycle");
+    } catch (err) {
+      setBusCfgError(err instanceof Error ? err.message : "Deploy failed");
+    } finally {
+      setBusCfgSaving(false);
+    }
+  }, [projectId, busCfgMachineId, busCfgDevices, navigate]);
+
   // ── Derived ──
   const activeDevVars  = useMemo(() => {
     const pts = history[activeTab] ?? [];
@@ -655,6 +834,11 @@ export default function ProjectView() {
             <Download size={13} /> {exporting ? "Exporting…" : "Export Excel"}
           </button>
 
+          {/* Configure Bus */}
+          <button onClick={openBusCfg} style={ctrlBtn(CLR.purple)}>
+            <Settings size={13} /> Configure Bus
+          </button>
+
           {/* Theme */}
           <button onClick={() => setTheme((t) => t === "dark" ? "light" : "dark")} style={{ ...ctrlBtn(), padding: "0 10px" }}>
             {isDark ? <Sun size={14} /> : <Moon size={14} />}
@@ -765,6 +949,239 @@ export default function ProjectView() {
           />
         </div>
       </div>
+
+      {/* ══ Bus Config Modal ══ */}
+      {busCfgOpen && (() => {
+        const mInp: React.CSSProperties = { width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#f8fafc", color: "#0f172a", fontSize: 13, outline: "none", boxSizing: "border-box" as const };
+        const mLbl: React.CSSProperties = { display: "block", fontSize: 10, fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 4 };
+        const allowedProtos: ("rtu" | "tcp")[] = busCfgProtocols === "RTU" ? ["rtu"] : busCfgProtocols === "TCP" ? ["tcp"] : ["rtu", "tcp"];
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)" }}>
+            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxWidth: 680, width: "95%", maxHeight: "92vh", overflowY: "auto", padding: 28, position: "relative" }}>
+
+              {/* Close */}
+              <button onClick={() => setBusCfgOpen(false)} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", color: "#64748b", cursor: "pointer", display: "flex" }}><X size={18} /></button>
+
+              {/* Header */}
+              <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 18, color: "#0f172a", marginBottom: 2 }}>Configure Bus</div>
+              <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 12, color: "#64748b", marginBottom: 20 }}>{projectName}</div>
+
+              {/* Loading */}
+              {busCfgLoading && (
+                <div style={{ display: "flex", justifyContent: "center", padding: "32px 0" }}>
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={CLR.blue} strokeWidth={2.5} style={{ animation: "spin-login 1s linear infinite" }}>
+                    <path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round" />
+                  </svg>
+                </div>
+              )}
+
+              {/* Node selector */}
+              {!busCfgLoading && !busCfgMachineId && busCfgNodes.length > 1 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Select Node</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {busCfgNodes.map((node) => (
+                      <button key={node.machine_id} onClick={() => loadNodeConfig(node.machine_id)}
+                        style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "12px 16px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", textAlign: "left" }}>
+                        <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>{node.node_name || node.machine_id}</span>
+                        <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: "#64748b", marginTop: 2 }}>{node.machine_id}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* No nodes */}
+              {!busCfgLoading && !busCfgMachineId && busCfgNodes.length === 0 && !busCfgError && (
+                <div style={{ fontSize: 13, color: "#64748b", padding: "20px 0" }}>No active nodes found for this project.</div>
+              )}
+
+              {/* Device list */}
+              {!busCfgLoading && busCfgMachineId && (
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase" }}>Devices</div>
+                      <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{busCfgMachineId}</div>
+                    </div>
+                    <button onClick={addBusCfgDevice}
+                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 7, border: `1px solid ${CLR.blue}44`, background: `${CLR.blue}10`, color: CLR.blue, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                      <Plus size={13} /> Add Device
+                    </button>
+                  </div>
+
+                  {busCfgDevices.length === 0 && (
+                    <div style={{ fontSize: 13, color: "#94a3b8", padding: "12px 0 20px" }}>No devices configured. Click "Add Device" to begin.</div>
+                  )}
+
+                  {busCfgDevices.map((dev, di) => (
+                    <div key={di} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 16, marginBottom: 14, background: "#fafcff" }}>
+
+                      {/* Device header */}
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                        <input value={dev.device_name} onChange={(e) => updateBusCfgDevice(di, { device_name: e.target.value })}
+                          placeholder="Device name (e.g. Main Incomer)"
+                          style={{ ...mInp, flex: 1, fontWeight: 600 }}
+                          onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                          onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                        <button onClick={() => removeBusCfgDevice(di)}
+                          style={{ display: "flex", alignItems: "center", padding: "7px", borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", cursor: "pointer", flexShrink: 0 }}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+
+                      {/* Meter model + Slave ID */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: 10, marginBottom: 10 }}>
+                        <div>
+                          <label style={mLbl}>Meter Model</label>
+                          <select value={dev.meter_model} onChange={(e) => updateBusCfgDevice(di, { meter_model: e.target.value })}
+                            style={{ ...mInp }}
+                            onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                            onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }}>
+                            <option value="">— Select —</option>
+                            {busCfgProfiles.map((p) => (
+                              <option key={p.model} value={p.model}>{p.display_name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label style={mLbl}>Slave ID</label>
+                          <input type="number" min={1} max={247} value={dev.slave_id} onChange={(e) => updateBusCfgDevice(di, { slave_id: Number(e.target.value) })}
+                            style={mInp}
+                            onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                            onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                        </div>
+                      </div>
+
+                      {/* Poll rate */}
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={mLbl}>Poll Rate (ms)</label>
+                        <input type="number" min={500} value={dev.poll_rate_ms} onChange={(e) => updateBusCfgDevice(di, { poll_rate_ms: Number(e.target.value) })}
+                          style={mInp}
+                          onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                          onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                      </div>
+
+                      {/* Protocol toggle */}
+                      <div style={{ marginBottom: 10 }}>
+                        <label style={mLbl}>Protocol</label>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          {allowedProtos.map((proto) => {
+                            const active = dev.protocol === proto;
+                            return (
+                              <button key={proto} type="button" onClick={() => updateBusCfgDevice(di, { protocol: proto })}
+                                style={{ padding: "6px 18px", borderRadius: 6, border: `1px solid ${active ? "#2563eb" : "#e2e8f0"}`, background: active ? "#eff6ff" : "#f8fafc", color: active ? "#2563eb" : "#64748b", fontWeight: 600, fontSize: 12, cursor: "pointer", textTransform: "uppercase" as const }}>
+                                {proto.toUpperCase()}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* RTU fields */}
+                      {dev.protocol === "rtu" && (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 10, marginBottom: 10 }}>
+                          <div>
+                            <label style={mLbl}>COM Port</label>
+                            <input value={dev.com_port} onChange={(e) => updateBusCfgDevice(di, { com_port: e.target.value })}
+                              placeholder="COM3" style={mInp}
+                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                              onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                          </div>
+                          <div>
+                            <label style={mLbl}>Baud Rate</label>
+                            <select value={dev.baud_rate} onChange={(e) => updateBusCfgDevice(di, { baud_rate: Number(e.target.value) })}
+                              style={mInp}
+                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                              onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }}>
+                              {[1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200].map((b) => (
+                                <option key={b} value={b}>{b}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* TCP fields */}
+                      {dev.protocol === "tcp" && (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: 10, marginBottom: 10 }}>
+                          <div>
+                            <label style={mLbl}>IP Address</label>
+                            <input value={dev.ip_address} onChange={(e) => updateBusCfgDevice(di, { ip_address: e.target.value })}
+                              placeholder="192.168.1.100" style={mInp}
+                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                              onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                          </div>
+                          <div>
+                            <label style={mLbl}>Port</label>
+                            <input type="number" min={1} max={65535} value={dev.tcp_port} onChange={(e) => updateBusCfgDevice(di, { tcp_port: Number(e.target.value) })}
+                              style={mInp}
+                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                              onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Register checklist */}
+                      {dev.registers.length > 0 && (
+                        <div style={{ marginTop: 12 }}>
+                          <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Registers</div>
+                          {dev.registers.map((reg, ri) => (
+                            <div key={ri} style={{ marginBottom: 8 }}>
+                              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                                <div onClick={() => toggleBusCfgRegister(di, ri)}
+                                  style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${reg.selected ? "#2563eb" : "#e2e8f0"}`, background: reg.selected ? "#eff6ff" : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                                  {reg.selected && <Check size={10} color="#2563eb" />}
+                                </div>
+                                <span style={{ fontSize: 13, color: reg.selected ? "#0f172a" : "#64748b", fontFamily: "'Share Tech Mono',monospace" }}>{reg.name}</span>
+                              </label>
+                              {reg.selected && (
+                                <div style={{ display: "flex", gap: 8, marginLeft: 27, marginTop: 4 }}>
+                                  <div style={{ flex: 1 }}>
+                                    <label style={{ display: "block", fontSize: 10, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 2 }}>Alarm Min</label>
+                                    <input type="number" value={reg.alarm_min} onChange={(e) => updateBusCfgRegisterAlarm(di, ri, "alarm_min", e.target.value)}
+                                      placeholder="—" style={{ ...mInp, padding: "5px 8px", fontSize: 12 }}
+                                      onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                                      onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                                  </div>
+                                  <div style={{ flex: 1 }}>
+                                    <label style={{ display: "block", fontSize: 10, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 2 }}>Alarm Max</label>
+                                    <input type="number" value={reg.alarm_max} onChange={(e) => updateBusCfgRegisterAlarm(di, ri, "alarm_max", e.target.value)}
+                                      placeholder="—" style={{ ...mInp, padding: "5px 8px", fontSize: 12 }}
+                                      onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
+                                      onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Error / success */}
+              {busCfgError   && <div style={{ padding: "9px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, color: "#dc2626", fontSize: 13, marginBottom: 14 }}>{busCfgError}</div>}
+              {busCfgSuccess && <div style={{ padding: "9px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, color: "#16a34a", fontSize: 13, marginBottom: 14 }}>{busCfgSuccess}</div>}
+
+              {/* Footer */}
+              {!busCfgLoading && busCfgMachineId && (
+                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+                  <button onClick={saveBusCfg} disabled={busCfgSaving}
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 11, borderRadius: 8, background: "#2563eb", border: "none", color: "#fff", fontWeight: 600, fontSize: 14, cursor: busCfgSaving ? "not-allowed" : "pointer", opacity: busCfgSaving ? 0.65 : 1 }}>
+                    {busCfgSaving
+                      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} style={{ animation: "spin-login 1s linear infinite" }}><path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round" /></svg>
+                      : "Save & Deploy"}
+                  </button>
+                  <button onClick={() => setBusCfgOpen(false)} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", color: "#64748b", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
