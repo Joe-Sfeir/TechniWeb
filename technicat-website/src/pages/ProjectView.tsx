@@ -594,8 +594,16 @@ export default function ProjectView() {
       const r = await fetch(`${API_URL}/api/projects/${projectId}/config/${machineId}`, { headers: { Authorization: `Bearer ${token}` } });
       if (handleAuthError(r, navigate)) return;
       if (r.status === 404) { setBusCfgDevices([]); setBusCfgLoading(false); return; }
-      const data = await r.json() as { devices?: Array<Omit<BusDeviceConfig, "registers"> & { registers?: Array<{ name: string; alarm_min?: string | number | null; alarm_max?: string | number | null }> }> };
-      const mapped: BusDeviceConfig[] = (data.devices ?? []).map((d) => {
+      type RawDevice = Omit<BusDeviceConfig, "registers"> & { registers?: Array<{ name: string; alarm_min?: string | number | null; alarm_max?: string | number | null }> };
+      type RawConfig = { devices?: RawDevice[] };
+      const data = await r.json() as RawConfig & { current_config?: RawConfig; config?: RawConfig; desired_config?: RawConfig };
+      const rawDevices: RawDevice[] =
+        data.current_config?.devices ??
+        data.devices ??
+        data.config?.devices ??
+        data.desired_config?.devices ??
+        [];
+      const mapped: BusDeviceConfig[] = rawDevices.map((d) => {
         const savedRegs = d.registers ?? [];
         const savedMap = new Map(savedRegs.map((r) => [r.name, r]));
         const profile = profiles.find((p) => p.model.toLowerCase() === d.meter_model.toLowerCase());

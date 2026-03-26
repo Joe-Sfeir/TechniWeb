@@ -157,25 +157,7 @@ const DEMO_USERS: User[] = [
   { id: "u4", email: "admin@technicat.com",name: "Admin User",    role: "SUB_MASTER", company: "Technicat Group",     reset_requested: false, last_login: "Today 08:00",   project_count: 0 },
 ];
 
-const METER_OPTIONS = [
-  { id: "schneider_pm2220", label: "Schneider PM2220" },
-  { id: "socomec",          label: "Socomec"           },
-  { id: "custom",           label: "Custom"            },
-  { id: "simulation",       label: "Simulation"        },
-  { id: "email_alerts",     label: "Email Alerts"      },
-  { id: "diagnostics",      label: "Diagnostics"       },
-];
-
-const ONLINE_METER_OPTIONS = [
-  { id: "schneider_pm2220",  label: "Schneider PM2220"  },
-  { id: "socomec_diris_a40", label: "Socomec Diris A40" },
-  { id: "lovato_dmg",        label: "Lovato DMG"        },
-  { id: "custom",            label: "Custom"            },
-  { id: "simulation",        label: "Simulation"        },
-  { id: "all",               label: "All"               },
-];
-
-const ONLINE_FEATURE_OPTIONS = [
+const FALLBACK_METER_OPTIONS = [
   { id: "email_alerts", label: "Email Alerts" },
   { id: "diagnostics",  label: "Diagnostics"  },
 ];
@@ -993,7 +975,7 @@ function CreateUserTab() {
 }
 
 // ─── Online Projects Tab ──────────────────────────────────────────────────────
-function OnlineProjectsTab() {
+function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label: string }[] }) {
   const navigate = useNavigate();
 
   // list state
@@ -1066,8 +1048,6 @@ function OnlineProjectsTab() {
   // node toggle
   const [nodeToggleLoading, setNodeToggleLoading] = useState<Record<string, boolean>>({});
 
-  // custom meter profiles (for merged meter options)
-  const [customProfiles, setCustomProfiles] = useState<MeterProfile[]>([]);
 
   // push config modal
   const [pushCfgProjectId,  setPushCfgProjectId]  = useState<string | null>(null);
@@ -1086,10 +1066,6 @@ function OnlineProjectsTab() {
       .then((d) => setProjects(Array.isArray(d) ? d : d.projects ?? []))
       .catch((err) => { if (err?.message !== "auth") setFetchError("Could not load online projects."); })
       .finally(() => setLoading(false));
-    fetch(`${API_BASE}/api/admin/meter-profiles`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => { if (handleAuthError(r, navigate)) throw new Error("auth"); return r.json(); })
-      .then((d) => setCustomProfiles(Array.isArray(d) ? d : d.profiles ?? []))
-      .catch(() => { /* non-critical */ });
   }, [navigate]);
 
   function openPushConfig(projectId: string, machineId: string, allowedMeters: string[]) {
@@ -1339,11 +1315,6 @@ function OnlineProjectsTab() {
   const deleteProject_ = projects.find((p) => p.id === deleteId);
   const renewProject_  = projects.find((p) => p.id === renewId);
 
-  const mergedOnlineMeterOptions = [
-    ...ONLINE_METER_OPTIONS,
-    ...customProfiles.map((p) => ({ id: p.model, label: p.display_name })),
-  ];
-
   return (
     <div className="admin-fade">
       {/* ── Renew Modal ─────────────────────────────────────────────────────── */}
@@ -1422,7 +1393,7 @@ function OnlineProjectsTab() {
                         >
                           {checked && <Check size={10} color={CLR.accent} />}
                         </div>
-                        <span style={{ fontSize: 13, color: checked ? CLR.text : CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{mergedOnlineMeterOptions.find((o) => o.id === reg)?.label ?? reg}</span>
+                        <span style={{ fontSize: 13, color: checked ? CLR.text : CLR.muted, fontFamily: "'Share Tech Mono',monospace" }}>{meterOptions.find((o) => o.id === reg)?.label ?? reg}</span>
                       </label>
                       {checked && (
                         <div style={{ display: "flex", gap: 8, marginLeft: 27 }}>
@@ -1550,21 +1521,7 @@ function OnlineProjectsTab() {
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {mergedOnlineMeterOptions.map((opt) => (
-                <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                  <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
-                    {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
-                  </div>
-                  <span style={{ fontSize: 13, color: meters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Features</label>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {ONLINE_FEATURE_OPTIONS.map((opt) => (
+              {meterOptions.map((opt) => (
                 <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                   <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                     {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
@@ -1702,20 +1659,7 @@ function OnlineProjectsTab() {
                       <div style={{ marginBottom: 14 }}>
                         <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                          {mergedOnlineMeterOptions.map((opt) => (
-                            <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                              <div onClick={() => toggleEditMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${editMeters.includes(opt.id) ? CLR.accent : CLR.border}`, background: editMeters.includes(opt.id) ? CLR.accentDim : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
-                                {editMeters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
-                              </div>
-                              <span style={{ fontSize: 13, color: editMeters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
-                            </label>
-                          ))}
-                        </div>
-                      </div>
-                      <div style={{ marginBottom: 14 }}>
-                        <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Features</label>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                          {ONLINE_FEATURE_OPTIONS.map((opt) => (
+                          {meterOptions.map((opt) => (
                             <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                               <div onClick={() => toggleEditMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${editMeters.includes(opt.id) ? CLR.accent : CLR.border}`, background: editMeters.includes(opt.id) ? CLR.accentDim : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                                 {editMeters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
@@ -1868,7 +1812,7 @@ function OnlineProjectsTab() {
 // ─── License Tab ──────────────────────────────────────────────────────────────
 type LicenseProtocol = "RTU Only" | "TCP Only" | "All Protocols";
 
-function LicenseTab() {
+function LicenseTab({ meterOptions }: { meterOptions: { id: string; label: string }[] }) {
   const navigate = useNavigate();
   const [username,    setUsername]    = useState("");
   const [projectName, setProjectName] = useState("");
@@ -1887,7 +1831,6 @@ function LicenseTab() {
     catch { return new Set<string>(); }
   });
   const [showHidden,     setShowHidden]     = useState(false);
-  const [customProfiles, setCustomProfiles] = useState<MeterProfile[]>([]);
 
   useEffect(() => {
     const token = getToken();
@@ -1903,10 +1846,6 @@ function LicenseTab() {
         setHistoryLoading(false);
       }
     })();
-    fetch(`${API_BASE}/api/admin/meter-profiles`, { headers: { Authorization: `Bearer ${token}` } })
-      .then((r) => { if (handleAuthError(r, navigate)) throw new Error("auth"); return r.json(); })
-      .then((d) => setCustomProfiles(Array.isArray(d) ? d : d.profiles ?? []))
-      .catch(() => { /* non-critical */ });
   }, [navigate]);
 
   function toggleMeter(id: string) {
@@ -1972,11 +1911,6 @@ function LicenseTab() {
     color: active ? (color ?? CLR.accent) : CLR.muted,
   });
 
-  const mergedLicenseMeterOptions = [
-    ...METER_OPTIONS,
-    ...customProfiles.map((p) => ({ id: p.model, label: p.display_name })),
-  ];
-
   return (
     <div className="admin-fade">
       <SectionHeader title="Offline Licenses" sub="Generate TechniDAQ offline client licenses" />
@@ -2016,7 +1950,7 @@ function LicenseTab() {
           <div>
             <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>Allowed Meters</label>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {mergedLicenseMeterOptions.map((opt) => (
+              {meterOptions.map((opt) => (
                 <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                   <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                     {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
@@ -2662,6 +2596,20 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<Tab>("fleet");
   const role = getRole();
+  const [allMeterProfiles, setAllMeterProfiles] = useState<MeterProfile[]>([]);
+
+  useEffect(() => {
+    const token = getToken();
+    fetch(`${API_BASE}/api/admin/meter-profiles`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => { if (handleAuthError(r, navigate)) throw new Error("auth"); return r.json(); })
+      .then((d) => setAllMeterProfiles(Array.isArray(d) ? d : d.profiles ?? []))
+      .catch(() => { /* fall back to FALLBACK_METER_OPTIONS */ });
+  }, [navigate]);
+
+  const meterOptions = [
+    ...allMeterProfiles.map((p) => ({ id: p.model, label: p.display_name })),
+    ...FALLBACK_METER_OPTIONS,
+  ];
 
   function logout() {
     clearAuth();
@@ -2756,8 +2704,8 @@ export default function AdminDashboard() {
           {tab === "fleet"           && <FleetTab />}
           {tab === "clients"         && <ClientsTab />}
           {tab === "create"          && <CreateUserTab />}
-          {tab === "online-projects" && <OnlineProjectsTab />}
-          {tab === "licenses"        && <LicenseTab />}
+          {tab === "online-projects" && <OnlineProjectsTab meterOptions={meterOptions} />}
+          {tab === "licenses"        && <LicenseTab meterOptions={meterOptions} />}
           {tab === "meter-profiles"  && <MeterProfilesTab />}
         </main>
       </div>
