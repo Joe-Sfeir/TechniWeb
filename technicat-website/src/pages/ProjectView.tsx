@@ -640,7 +640,7 @@ export default function ProjectView() {
               alarm_min: (r.min_alarm ?? r.alarm_min) != null ? String(r.min_alarm ?? r.alarm_min) : "",
               alarm_max: (r.max_alarm ?? r.alarm_max) != null ? String(r.max_alarm ?? r.alarm_max) : "",
             }));
-        return { ...d, registers };
+        return { ...d, meter_model: (d.meter_model ?? "").toLowerCase(), registers };
       });
       setBusCfgDevices(mapped);
     } catch {
@@ -1133,7 +1133,7 @@ export default function ProjectView() {
                             onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }}>
                             <option value="">— Select —</option>
                             {busCfgProfiles.map((p) => (
-                              <option key={p.model} value={p.model}>{p.display_name}</option>
+                              <option key={p.model} value={p.model.toLowerCase()}>{p.display_name}</option>
                             ))}
                           </select>
                         </div>
