@@ -137,6 +137,7 @@ interface NodeStatus {
   polling_state: "running" | "stopped" | "fault";
   last_seen?: string;
   is_active?: boolean;
+  active_devices?: string[];
 }
 
 // ─── Demo data (offline fallback) ─────────────────────────────────────────────
@@ -394,7 +395,6 @@ export default function ProjectView() {
   const [thresholds,  setThresholds]  = useState<ThresholdMap>({});
   const [lastPollMs,       setLastPollMs]       = useState(0);
   const [lastDataMs,       setLastDataMs]       = useState(0);
-  const [deviceMissedPolls,setDeviceMissedPolls]= useState<Record<string, number>>({});
   const [showAllDevices,   setShowAllDevices]   = useState(false);
   const [loading,        setLoading]        = useState(true);
   const [demoMode,       setDemoMode]       = useState(false);
@@ -416,11 +416,7 @@ export default function ProjectView() {
   const [busCfgSuccess,   setBusCfgSuccess]   = useState<string | null>(null);
 
   const lastTimestampRef = useRef<string | null>(null);
-  const devicesRef       = useRef<string[]>([]);
   const isDark           = theme === "dark";
-
-  // Keep devicesRef in sync so processRows (useCallback []) can read it without a stale closure
-  useEffect(() => { devicesRef.current = devices; }, [devices]);
 
   // ── CSS injection ──
   useEffect(() => {
@@ -504,21 +500,6 @@ export default function ProjectView() {
     setLastPollMs(Date.now());
     setLastDataMs(Date.now());
 
-    // Track consecutive missed polls per device
-    if (replace) {
-      // Initial load — clean slate, all devices active
-      setDeviceMissedPolls({});
-    } else {
-      // Incremental poll — devices absent from this batch get +1 missed, present ones reset to 0
-      const pollDeviceSet = new Set(devList);
-      setDeviceMissedPolls((prev) => {
-        const next = { ...prev };
-        devicesRef.current.forEach((d) => {
-          next[d] = pollDeviceSet.has(d) ? 0 : (next[d] ?? 0) + 1;
-        });
-        return next;
-      });
-    }
   }, []);
 
   // ── Initial fetch ──
@@ -811,9 +792,15 @@ export default function ProjectView() {
   const hasFault    = isLive && !hasStopped && activeNodeStatuses.length > 0 && activeNodeStatuses.every((n) => n.polling_state === "fault");
   const stoppedNode = activeNodeStatuses.find((n) => n.polling_state === "stopped");
 
+  const activeDeviceNames = useMemo(() => {
+    const s = new Set<string>();
+    nodeStatuses.forEach((n) => n.active_devices?.forEach((d) => s.add(d)));
+    return s;
+  }, [nodeStatuses]);
+
   const inactiveDeviceSet = useMemo(() =>
-    new Set(devices.filter((d) => (deviceMissedPolls[d] ?? 0) >= 2)),
-  [devices, deviceMissedPolls]);
+    new Set(devices.filter((d) => activeDeviceNames.size > 0 && !activeDeviceNames.has(d))),
+  [devices, activeDeviceNames]);
 
   const visibleDevices = useMemo(() => {
     if (showAllDevices) return devices;
