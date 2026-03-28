@@ -599,17 +599,19 @@ export default function ProjectView() {
       const r = await fetch(`${API_URL}/api/projects/${projectId}/config/${machineId}`, { headers: { Authorization: `Bearer ${token}` } });
       if (handleAuthError(r, navigate)) return;
       if (r.status === 404) { setBusCfgDevices([]); setBusCfgLoading(false); return; }
-      type RawDevice = Omit<BusDeviceConfig, "registers"> & { registers?: Array<{ name: string; address?: number; length?: number; data_type?: string; multiplier?: number; alarm_min?: string | number | null; alarm_max?: string | number | null; min_alarm?: string | number | null; max_alarm?: string | number | null }> };
+      type RawReg = { name: string; address?: number; length?: number; data_type?: string; multiplier?: number; alarm_min?: string | number | null; alarm_max?: string | number | null; min_alarm?: string | number | null; max_alarm?: string | number | null };
+      type RawDevice = Omit<BusDeviceConfig, "registers"> & { registers?: RawReg[]; selected_registers?: RawReg[] };
       type RawConfig = { devices?: RawDevice[] };
-      const data = await r.json() as RawConfig & { current_config?: RawConfig; config?: RawConfig; desired_config?: RawConfig };
+      const data = await r.json() as RawConfig & { current_config?: RawDevice[] | RawConfig; config?: RawConfig; desired_config?: RawConfig };
       const rawDevices: RawDevice[] =
-        data.current_config?.devices ??
-        data.devices ??
-        data.config?.devices ??
-        data.desired_config?.devices ??
+        (Array.isArray(data.current_config) && data.current_config.length > 0) ? data.current_config as RawDevice[] :
+        (Array.isArray((data.current_config as RawConfig)?.devices) && ((data.current_config as RawConfig).devices!.length > 0)) ? (data.current_config as RawConfig).devices! :
+        (Array.isArray(data.devices) && data.devices.length > 0) ? data.devices :
+        (Array.isArray(data.config?.devices) && data.config!.devices!.length > 0) ? data.config!.devices! :
+        (Array.isArray(data.desired_config?.devices) && data.desired_config!.devices!.length > 0) ? data.desired_config!.devices! :
         [];
       const mapped: BusDeviceConfig[] = rawDevices.map((d) => {
-        const savedRegs = d.registers ?? [];
+        const savedRegs = d.selected_registers ?? d.registers ?? [];
         const savedMap = new Map(savedRegs.map((r) => [r.name, r]));
         const profile = profiles.find((p) => p.model.toLowerCase() === d.meter_model.toLowerCase());
         const registers: BusRegisterEntry[] = profile
