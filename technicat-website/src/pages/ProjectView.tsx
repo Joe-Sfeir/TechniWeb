@@ -104,7 +104,7 @@ interface MeterProfileLight {
   id: string;
   model: string;
   display_name: string;
-  registers: { name: string }[];
+  registers: { name: string; address?: number; length?: number; data_type?: string; multiplier?: number }[];
 }
 
 interface BusRegisterEntry {
@@ -112,6 +112,10 @@ interface BusRegisterEntry {
   selected: boolean;
   alarm_min: string;
   alarm_max: string;
+  address?: number;
+  length?: number;
+  data_type?: string;
+  multiplier?: number;
 }
 
 interface BusDeviceConfig {
@@ -595,7 +599,7 @@ export default function ProjectView() {
       const r = await fetch(`${API_URL}/api/projects/${projectId}/config/${machineId}`, { headers: { Authorization: `Bearer ${token}` } });
       if (handleAuthError(r, navigate)) return;
       if (r.status === 404) { setBusCfgDevices([]); setBusCfgLoading(false); return; }
-      type RawDevice = Omit<BusDeviceConfig, "registers"> & { registers?: Array<{ name: string; alarm_min?: string | number | null; alarm_max?: string | number | null }> };
+      type RawDevice = Omit<BusDeviceConfig, "registers"> & { registers?: Array<{ name: string; address?: number; length?: number; data_type?: string; multiplier?: number; alarm_min?: string | number | null; alarm_max?: string | number | null; min_alarm?: string | number | null; max_alarm?: string | number | null }> };
       type RawConfig = { devices?: RawDevice[] };
       const data = await r.json() as RawConfig & { current_config?: RawConfig; config?: RawConfig; desired_config?: RawConfig };
       const rawDevices: RawDevice[] =
@@ -611,18 +615,28 @@ export default function ProjectView() {
         const registers: BusRegisterEntry[] = profile
           ? profile.registers.map((r) => {
               const saved = savedMap.get(r.name);
+              const alarmMin = saved?.min_alarm ?? saved?.alarm_min;
+              const alarmMax = saved?.max_alarm ?? saved?.alarm_max;
               return {
                 name: r.name,
+                address: r.address,
+                length: r.length,
+                data_type: r.data_type,
+                multiplier: r.multiplier,
                 selected: savedMap.has(r.name),
-                alarm_min: saved?.alarm_min != null ? String(saved.alarm_min) : "",
-                alarm_max: saved?.alarm_max != null ? String(saved.alarm_max) : "",
+                alarm_min: alarmMin != null ? String(alarmMin) : "",
+                alarm_max: alarmMax != null ? String(alarmMax) : "",
               };
             })
           : savedRegs.map((r) => ({
               name: r.name,
+              address: r.address,
+              length: r.length,
+              data_type: r.data_type,
+              multiplier: r.multiplier,
               selected: true,
-              alarm_min: r.alarm_min != null ? String(r.alarm_min) : "",
-              alarm_max: r.alarm_max != null ? String(r.alarm_max) : "",
+              alarm_min: (r.min_alarm ?? r.alarm_min) != null ? String(r.min_alarm ?? r.alarm_min) : "",
+              alarm_max: (r.max_alarm ?? r.alarm_max) != null ? String(r.max_alarm ?? r.alarm_max) : "",
             }));
         return { ...d, registers };
       });
@@ -692,7 +706,7 @@ export default function ProjectView() {
       if (patch.meter_model !== undefined && patch.meter_model !== d.meter_model) {
         const profile = busCfgProfiles.find((p) => p.model.toLowerCase() === (patch.meter_model ?? "").toLowerCase());
         updated.registers = profile
-          ? profile.registers.map((r) => ({ name: r.name, selected: false, alarm_min: "", alarm_max: "" }))
+          ? profile.registers.map((r) => ({ name: r.name, address: r.address, length: r.length, data_type: r.data_type, multiplier: r.multiplier, selected: false, alarm_min: "", alarm_max: "" }))
           : [];
       }
       return updated;
@@ -735,11 +749,19 @@ export default function ProjectView() {
             tcp_port: d.tcp_port,
             registers: d.registers
               .filter((r) => r.selected)
-              .map((r) => ({
-                name: r.name,
-                alarm_min: r.alarm_min !== "" ? Number(r.alarm_min) : null,
-                alarm_max: r.alarm_max !== "" ? Number(r.alarm_max) : null,
-              })),
+              .map((r) => {
+                const profile = busCfgProfiles.find((p) => p.model.toLowerCase() === d.meter_model.toLowerCase());
+                const profReg = profile?.registers.find((pr) => pr.name === r.name);
+                return {
+                  name: r.name,
+                  address: profReg?.address ?? r.address,
+                  length: profReg?.length ?? r.length,
+                  data_type: profReg?.data_type ?? r.data_type,
+                  multiplier: profReg?.multiplier ?? r.multiplier,
+                  min_alarm: r.alarm_min !== "" ? Number(r.alarm_min) : null,
+                  max_alarm: r.alarm_max !== "" ? Number(r.alarm_max) : null,
+                };
+              }),
           })),
         },
       };
