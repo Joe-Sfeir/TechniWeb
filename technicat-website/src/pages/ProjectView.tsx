@@ -132,6 +132,7 @@ interface NodeStatus {
   node_name?: string;
   polling_state: "running" | "stopped" | "fault";
   last_seen?: string;
+  is_active?: boolean;
 }
 
 // ─── Demo data (offline fallback) ─────────────────────────────────────────────
@@ -400,7 +401,7 @@ export default function ProjectView() {
 
   // ── Bus Config modal ──
   const [busCfgOpen,      setBusCfgOpen]      = useState(false);
-  const [busCfgNodes,     setBusCfgNodes]     = useState<{ machine_id: string; node_name: string }[]>([]);
+  const [busCfgNodes,     setBusCfgNodes]     = useState<{ machine_id: string; node_name: string; is_active?: boolean }[]>([]);
   const [busCfgMachineId, setBusCfgMachineId] = useState<string | null>(null);
   const [busCfgProtocols, setBusCfgProtocols] = useState<string>("All");
   const [busCfgProfiles,  setBusCfgProfiles]  = useState<MeterProfileLight[]>([]);
@@ -656,12 +657,13 @@ export default function ProjectView() {
         freshProfiles = Array.isArray(raw) ? raw : (raw.profiles ?? raw.meter_profiles ?? raw.data ?? []);
       }
       setBusCfgProfiles(freshProfiles);
-      const nodesData = await nodesRes.json() as { nodes?: { machine_id: string; node_name: string }[]; protocols?: string };
+      const nodesData = await nodesRes.json() as { nodes?: { machine_id: string; node_name: string; is_active?: boolean }[]; protocols?: string };
       const nodes = nodesData.nodes ?? [];
-      setBusCfgNodes(nodes);
+      const activeNodes = nodes.filter((n) => n.is_active !== false);
+      setBusCfgNodes(activeNodes);
       setBusCfgProtocols(nodesData.protocols ?? "All");
-      if (nodes.length === 1) {
-        await loadNodeConfig(nodes[0].machine_id, freshProfiles);
+      if (activeNodes.length === 1) {
+        await loadNodeConfig(activeNodes[0].machine_id, freshProfiles);
       } else {
         setBusCfgLoading(false);
       }
@@ -780,9 +782,10 @@ export default function ProjectView() {
   const isVeryStale  = dataAge > 5 * 60_000;
   const staleMinutes = Math.floor(dataAge / 60_000);
 
-  const hasStopped  = isLive && nodeStatuses.some((n) => n.polling_state === "stopped");
-  const hasFault    = isLive && !hasStopped && nodeStatuses.some((n) => n.polling_state === "fault");
-  const stoppedNode = nodeStatuses.find((n) => n.polling_state === "stopped");
+  const activeNodeStatuses = nodeStatuses.filter((n) => n.is_active !== false);
+  const hasStopped  = isLive && activeNodeStatuses.length > 0 && activeNodeStatuses.every((n) => n.polling_state === "stopped");
+  const hasFault    = isLive && !hasStopped && activeNodeStatuses.length > 0 && activeNodeStatuses.every((n) => n.polling_state === "fault");
+  const stoppedNode = activeNodeStatuses.find((n) => n.polling_state === "stopped");
 
   const inactiveDeviceSet = useMemo(() =>
     new Set(devices.filter((d) => (deviceMissedPolls[d] ?? 0) >= 2)),
