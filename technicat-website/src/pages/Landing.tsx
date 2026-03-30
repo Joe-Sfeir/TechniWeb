@@ -121,22 +121,6 @@ function HR({ style: s }: { style?: React.CSSProperties }) {
 /* ─────────────────────────────────────────────
    SECTION NUMBER
 ──────────────────────────────────────────────*/
-function SNum({ n }: { n: string }) {
-  return (
-    <span style={{
-      fontFamily: "'Barlow Condensed', 'Arial Narrow', sans-serif",
-      fontSize: "clamp(7rem,18vw,18rem)",
-      fontWeight: 900,
-      color: DIMMEST,
-      lineHeight: 1,
-      letterSpacing: "-0.04em",
-      position: "absolute",
-      right: 0, top: -24,
-      userSelect: "none",
-      pointerEvents: "none",
-    }}>{n}</span>
-  );
-}
 
 /* ═══════════════════════════════════════════════
    LANDING
@@ -623,7 +607,7 @@ export default function Landing() {
 
             {/* Pricing — brutalist table */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%,280px),1fr))", gap: 1, background: BORDER }}>
-              {tiers.map((t, i) => (
+              {tiers.map((t) => (
                 <div key={t.name} style={{
                   background: t.featured ? "rgba(26,95,255,0.06)" : BG2,
                   padding: "40px 32px",
@@ -805,7 +789,7 @@ export default function Landing() {
               <span style={{ fontFamily: "'Barlow Condensed',sans-serif", fontWeight: 900, fontSize: "0.95rem", color: W, letterSpacing: "0.12em" }}>TECHNICAT<span style={{ color: BLUE }}>GROUP</span></span>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 0 }}>
-              {[["Projects", "/projects", true],["Careers", "/careers", true],["Portal", "/login", true]].map(([l,h,r]) => (
+              {[["Projects", "/projects", true],["Careers", "/careers", true],["Portal", "/login", true]].map(([l,h,_r]) => (
                 <Link key={String(l)} to={String(h)} style={{ fontFamily: "'Barlow',sans-serif", fontSize: 11, fontWeight: 500, color: DIMMER, textDecoration: "none", letterSpacing: "0.12em", textTransform: "uppercase", padding: "6px 16px", transition: "color 0.2s" }}
                   onMouseEnter={e => { e.currentTarget.style.color = W; }}
                   onMouseLeave={e => { e.currentTarget.style.color = DIMMER; }}
