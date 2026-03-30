@@ -527,27 +527,52 @@ export default function ProjectView() {
     })();
   }, [projectId, processRows, navigate, backTo]);
 
-  // ── Polling ──
+  // ── SSE stream (replaces polling) ──
   useEffect(() => {
     if (loading || demoMode || !projectId) return;
     const token = getToken();
-    const id = setInterval(async () => {
-      const since = lastTimestampRef.current;
-      const url   = `${API_URL}/api/telemetry/${projectId}${since ? `?since=${encodeURIComponent(since)}` : ""}`;
+    if (!token) return;
+
+    // EventSource doesn't support custom headers — pass JWT as query param
+    const url = `${API_URL}/api/telemetry/stream/${projectId}?token=${encodeURIComponent(token)}`;
+    const es = new EventSource(url);
+
+    es.addEventListener('telemetry', (e) => {
       try {
-        const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-        if (handleAuthError(r, navigate)) return;
-        if (!r.ok) return;
-        const data = await r.json() as { rows?: TelemetryRow[]; thresholds?: ThresholdMap; nodes?: NodeStatus[] } | TelemetryRow[];
-        const rows = Array.isArray(data) ? data : (data.rows ?? []);
-        if (!Array.isArray(data) && data.thresholds) setThresholds(data.thresholds);
-        if (!Array.isArray(data) && data.nodes) setNodeStatuses(data.nodes);
-        if (rows.length > 0) processRows(rows, false);
-        else setLastPollMs(Date.now());
-      } catch { /* silent for transient network failures */ }
-    }, POLL_MS);
-    return () => clearInterval(id);
-  }, [loading, demoMode, projectId, processRows, navigate]);
+        const { rows } = JSON.parse((e as MessageEvent).data) as { rows: Array<{ timestamp: string; device_name: string; data: Record<string, unknown> }> };
+        if (Array.isArray(rows) && rows.length > 0) {
+          const flatRows: TelemetryRow[] = rows.map((r) => ({
+            timestamp:   r.timestamp,
+            device_name: r.device_name,
+            ...r.data,
+          }));
+          processRows(flatRows, false);
+        }
+      } catch { /* ignore malformed events */ }
+    });
+
+    es.addEventListener('nodes', (e) => {
+      try {
+        const node = JSON.parse((e as MessageEvent).data) as NodeStatus & { thresholds?: ThresholdMap };
+        setNodeStatuses((prev) => {
+          const idx = prev.findIndex((n) => n.machine_id === node.machine_id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = { ...next[idx]!, ...node };
+            return next;
+          }
+          return [...prev, node];
+        });
+        if (node.thresholds) setThresholds((prev) => ({ ...prev, ...node.thresholds }));
+      } catch { /* ignore malformed events */ }
+    });
+
+    es.onerror = () => {
+      console.warn('[sse] connection error — will auto-reconnect');
+    };
+
+    return () => es.close();
+  }, [loading, demoMode, projectId, processRows]);
 
   // ── Export ──
   const handleExport = useCallback(async () => {
