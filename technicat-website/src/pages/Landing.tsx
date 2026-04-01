@@ -143,21 +143,21 @@ export default function Landing() {
   useEffect(() => {
     if (isMobile) return;
 
-    setFramesLoaded(0);
     const images: HTMLImageElement[] = [];
 
     for (let i = 1; i <= TOTAL_FRAMES; i++) {
       const img = new Image();
       const frameNumber = i.toString().padStart(4, '0');
-      img.src = `/frames/frame_${frameNumber}.webp`;
+      const capturedIndex = i;
 
       img.onload = () => {
         setFramesLoaded(prev => prev + 1);
-
-        if (i === 1 && canvasRef.current) {
+        if (capturedIndex === 1 && canvasRef.current) {
           drawFrame(1, canvasRef.current, img);
         }
       };
+      img.src = `/frame_${frameNumber}.webp`;
+
       images.push(img);
     }
 
