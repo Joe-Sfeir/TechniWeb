@@ -1,6 +1,6 @@
-import { useRef, useEffect, ReactNode, useState } from 'react';
+import { useRef, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Server, Zap, MapPin, Mail, ChevronRight, BarChart3, ShieldCheck, X, Phone, Linkedin, Activity } from 'lucide-react';
+import { ArrowRight, Server, Zap, MapPin, Mail, ChevronRight, BarChart3, ShieldCheck, Phone, Linkedin, Activity } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useGSAP } from '@gsap/react';
@@ -143,7 +143,7 @@ export default function Landing() {
   useEffect(() => {
     if (isMobile) return;
 
-    let loadedCount = 0;
+    setFramesLoaded(0);
     const images: HTMLImageElement[] = [];
 
     for (let i = 1; i <= TOTAL_FRAMES; i++) {
@@ -152,8 +152,7 @@ export default function Landing() {
       img.src = `/frames/frame_${frameNumber}.webp`;
 
       img.onload = () => {
-        loadedCount++;
-        setFramesLoaded(loadedCount);
+        setFramesLoaded(prev => prev + 1);
 
         if (i === 1 && canvasRef.current) {
           drawFrame(1, canvasRef.current, img);
@@ -285,7 +284,7 @@ export default function Landing() {
     gsap.fromTo(".stat-bar",
       { height: "0%" },
       {
-        height: (i, el) => el.dataset.height + "%",
+        height: (_: number, el: Element) => (el as HTMLElement).dataset.height + "%",
         duration: 2,
         stagger: 0.15,
         ease: "expo.out",
