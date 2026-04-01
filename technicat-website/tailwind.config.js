@@ -25,11 +25,16 @@ export default {
           900: "#1e3a8a",
           950: "#172554",
         },
+        'brand-blue':  '#1a5fff',
+        'brand-black': '#050505',
+        'brand-gray':  '#111111',
       },
       animation: {
-        "fade-up":   "fadeUp 0.65s cubic-bezier(0.16,1,0.3,1) forwards",
-        "fade-in":   "fadeIn 0.45s ease forwards",
-        "slide-down":"slideDown 0.3s ease forwards",
+        "fade-up":    "fadeUp 0.65s cubic-bezier(0.16,1,0.3,1) forwards",
+        "fade-in":    "fadeIn 0.45s ease forwards",
+        "slide-down": "slideDown 0.3s ease forwards",
+        "pulse-slow": "pulse-glow 4s ease-in-out infinite alternate",
+        "spin-slow":  "spin 8s linear infinite",
       },
       keyframes: {
         fadeUp: {
@@ -43,6 +48,10 @@ export default {
         slideDown: {
           "0%":   { opacity: "0", transform: "translateY(-8px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "pulse-glow": {
+          "0%":   { opacity: "0.3", transform: "scale(0.9)" },
+          "100%": { opacity: "0.7", transform: "scale(1.1)" },
         },
       },
       boxShadow: {

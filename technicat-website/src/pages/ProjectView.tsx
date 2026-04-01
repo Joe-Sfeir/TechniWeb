@@ -537,7 +537,7 @@ export default function ProjectView() {
     const url = `${API_URL}/api/telemetry/stream/${projectId}?token=${encodeURIComponent(token)}`;
     const es = new EventSource(url);
 
-    es.addEventListener('telemetry', (e) => {
+    es.addEventListener('telemetry', (e) => { console.log('[sse] telemetry received', e);
       try {
         const { rows } = JSON.parse((e as MessageEvent).data) as { rows: Array<{ timestamp: string; device_name: string; data: Record<string, unknown> }> };
         if (Array.isArray(rows) && rows.length > 0) {

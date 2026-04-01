@@ -153,3 +153,31 @@ html.dark {
     @apply animate-fade-up opacity-100;
   }
 }
+
+/* ── Landing page additions (from new UI prototype) ─────────── */
+.metallic-surface {
+  background: linear-gradient(145deg, #1a1a1a 0%, #0a0a0a 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 30px 60px rgba(0,0,0,0.8);
+  border: 1px solid rgba(255,255,255,0.05);
+}
+.premium-border { border: 1px solid rgba(255,255,255,0.05); }
+.premium-card {
+  background: linear-gradient(180deg, #111111 0%, #0a0a0a 100%);
+  border: 1px solid rgba(255,255,255,0.05);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+}
+.text-gradient-blue {
+  background: linear-gradient(to right, #60a5fa, #1a5fff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+@keyframes pulse-glow {
+  0%   { opacity: 0.3; transform: scale(0.9); }
+  100% { opacity: 0.7; transform: scale(1.1); }
+}
+.animate-pulse-slow { animation: pulse-glow 4s ease-in-out infinite alternate; }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: #050505; }
+::-webkit-scrollbar-thumb { background: #222; }
+::-webkit-scrollbar-thumb:hover { background: #1a5fff; }
