@@ -1,39 +1,115 @@
-import React, { useState, useEffect } from "react";
+import React, { useRef, useEffect, type ReactNode, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  Zap, ArrowRight, CircuitBoard, Monitor, Gauge, Award,
-  ChevronUp, Menu, X, Check, Linkedin,
-  Mail, MapPin, Users,
+  ArrowRight,
+  CircuitBoard,
+  Monitor,
+  Gauge,
+  Award,
+  Users,
+  Check,
+  MapPin,
+  Mail,
+  Phone,
+  Linkedin
 } from "lucide-react";
+import gsap from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useGSAP } from '@gsap/react';
+import { BackgroundGrid } from '../components/BackgroundGrid';
+
+gsap.registerPlugin(ScrollTrigger);
+
+const Magnetic = ({ children, className }: { children: ReactNode, className?: string }) => {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const xTo = gsap.quickTo(el, "x", { duration: 1, ease: "elastic.out(1, 0.3)" });
+    const yTo = gsap.quickTo(el, "y", { duration: 1, ease: "elastic.out(1, 0.3)" });
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const { clientX, clientY } = e;
+      const { height, width, left, top } = el.getBoundingClientRect();
+      const x = clientX - (left + width / 2);
+      const y = clientY - (top + height / 2);
+      xTo(x * 0.4);
+      yTo(y * 0.4);
+    };
+
+    const handleMouseLeave = () => {
+      xTo(0);
+      yTo(0);
+    };
+
+    el.addEventListener("mousemove", handleMouseMove);
+    el.addEventListener("mouseleave", handleMouseLeave);
+
+    return () => {
+      el.removeEventListener("mousemove", handleMouseMove);
+      el.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, []);
+
+  return <div ref={ref} className={className}>{children}</div>;
+};
+
+const RevealText = ({ children, className }: { children: ReactNode, className?: string }) => {
+  const textRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    if (!textRef.current) return;
+
+    gsap.fromTo(textRef.current,
+      { opacity: 0, y: 20 },
+      {
+        opacity: 1,
+        y: 0,
+        duration: 1.2,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: textRef.current,
+          start: "top 85%",
+        }
+      }
+    );
+  }, []);
+
+  return <div ref={textRef} className={className}>{children}</div>;
+};
 
 const ROLES = ["Electrical Engineer", "SCADA Developer", "Technician", "Internship"] as const;
 type Role = typeof ROLES[number];
 
-const OPEN_ROLES: { title: Role; dept: string; type: string; Icon: React.ElementType; accent: string; desc: string }[] = [
-  { title: "Electrical Engineer", dept: "Engineering", type: "Full-time", Icon: CircuitBoard, accent: "#2563eb",
+const OPEN_ROLES: { title: Role; dept: string; type: string; Icon: React.ElementType; desc: string }[] = [
+  { title: "Electrical Engineer", dept: "Engineering", type: "Full-time", Icon: CircuitBoard,
     desc: "Design and commission LV distribution systems, MDBs, MCCs, and ATS units for mission-critical clients." },
-  { title: "SCADA Developer",    dept: "Software",     type: "Full-time", Icon: Monitor,      accent: "#7c3aed",
+  { title: "SCADA Developer",    dept: "Software",     type: "Full-time", Icon: Monitor,
     desc: "Build and extend TechniDAQ — our edge-to-cloud SCADA platform — using modern web and embedded tech." },
-  { title: "Technician",         dept: "Field Ops",    type: "Full-time", Icon: Gauge,        accent: "#0891b2",
+  { title: "Technician",         dept: "Field Ops",    type: "Full-time", Icon: Gauge,
     desc: "Install, test, and commission electrical panels and monitoring hardware at client sites across Lebanon." },
-  { title: "Internship",         dept: "Various",      type: "Part-time / Seasonal", Icon: Award, accent: "#16a34a",
+  { title: "Internship",         dept: "Various",      type: "Part-time / Seasonal", Icon: Award,
     desc: "Gain hands-on experience in LV panel manufacturing and SCADA systems alongside our engineering team." },
 ];
 
 export default function Careers() {
-  const dark = false;
-  const [scrolled,  setScrolled]  = useState(false);
-  const [menuOpen,  setMenuOpen]  = useState(false);
+  const mainRef = useRef<HTMLDivElement>(null);
   const [form,      setForm]      = useState({ name: "", email: "", role: ROLES[0] as string, letter: "" });
   const [fileName,  setFileName]  = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [highlight, setHighlight] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fn = () => setScrolled(window.scrollY > 40);
-    window.addEventListener("scroll", fn, { passive: true });
-    return () => window.removeEventListener("scroll", fn);
-  }, []);
+  useGSAP(() => {
+    gsap.fromTo(".role-card",
+      { y: 40, opacity: 0 },
+      {
+        y: 0, opacity: 1, duration: 1, stagger: 0.15, ease: "power3.out",
+        scrollTrigger: { trigger: ".roles-grid", start: "top 80%" }
+      }
+    );
+  }, { scope: mainRef });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -53,314 +129,234 @@ export default function Careers() {
     setSubmitted(true);
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 14,
-    border: "1.5px solid var(--t-border)", color: "var(--t-fg)", background: "var(--t-input)",
-    outline: "none", transition: "border-color 0.2s, box-shadow 0.2s",
-    fontFamily: "'Inter', sans-serif", boxSizing: "border-box",
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: "block", fontSize: 11, fontWeight: 600, color: "var(--t-muted)",
-    letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6,
-  };
-
-  const navH        = scrolled ? 64 : 72;
-  const navScrolled = scrolled ? "var(--t-nav)" : "transparent";
-  const navBorder   = scrolled ? "1px solid var(--t-nav-border)" : "1px solid transparent";
-  const navShadow   = scrolled ? (dark ? "0 1px 2px rgba(0,0,0,0.3),0 4px 16px rgba(0,0,0,0.2)" : "0 1px 2px rgba(0,0,0,0.04),0 4px 16px rgba(0,0,0,0.04)") : "none";
-
   return (
-    <>
-      <style>{`
-        *,*::before,*::after{box-sizing:border-box}
-        html{scroll-behavior:smooth}
-        body{margin:0;overflow-x:hidden;font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased}
-        #root{width:100%;min-height:100svh}
-        .font-display{font-family:'Plus Jakarta Sans','Inter',sans-serif}
-        @media(min-width:768px){.show-mobile{display:none!important}}
-        @media(max-width:767px){.hidden-mobile{display:none!important}}
-        .careers-input::placeholder{color:var(--t-muted2)}
-      `}</style>
+    <div ref={mainRef} className="min-h-screen bg-brand-black text-white font-sans selection:bg-brand-blue/30 overflow-hidden relative">
 
-      {/* ══════ NAVBAR ══════ */}
-      <header style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 50,
-        background: navScrolled, backdropFilter: scrolled ? "blur(14px)" : "none",
-        border: navBorder, boxShadow: navShadow, transition: "all 0.3s ease",
-      }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
-          <nav style={{ display: "flex", alignItems: "center", justifyContent: "space-between", height: navH, transition: "height 0.3s ease" }}>
-            <Link to="/" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none" }}>
-              <div style={{ width: 32, height: 32, borderRadius: 8, background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <Zap size={16} color="#fff" strokeWidth={2.5} />
-              </div>
-              <span className="font-display" style={{ fontWeight: 700, fontSize: "1.1rem", letterSpacing: "-0.025em", color: "var(--t-fg)" }}>
-                Technicat<span style={{ color: "#2563eb" }}>Group</span>
-              </span>
-            </Link>
+      <BackgroundGrid />
 
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }} className="hidden-mobile">
-              <Link to="/" style={{ fontSize: 14, fontWeight: 500, color: "var(--t-fg3)", textDecoration: "none", padding: "8px 14px", borderRadius: 10, transition: "all 0.15s" }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "#2563eb"; e.currentTarget.style.background = "var(--t-blue-tint)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "var(--t-fg3)"; e.currentTarget.style.background = "none"; }}>
-                ← Back to Home
-              </Link>
-              <a href="mailto:joesfeir007@gmail.com?subject=Project%20Inquiry%20%E2%80%94%20Technicat%20Group" style={{
-                display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 20px", borderRadius: 10,
-                fontSize: 14, fontWeight: 600, background: "#2563eb", color: "#fff", border: "none",
-                cursor: "pointer", boxShadow: "0 4px 16px rgba(37,99,235,0.2)", transition: "all 0.2s",
-                textDecoration: "none",
-              }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#1d4ed8"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "#2563eb"; e.currentTarget.style.transform = "translateY(0)"; }}>
-                Get a Quote <ArrowRight size={14} />
-              </a>
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }} className="show-mobile">
-              <button onClick={() => setMenuOpen((o) => !o)} style={{ padding: 8, borderRadius: 8, background: "none", border: "none", cursor: "pointer", color: "var(--t-fg2)" }}>
-                {menuOpen ? <X size={22} /> : <Menu size={22} />}
-              </button>
-            </div>
-          </nav>
+      {/* NAVIGATION */}
+      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-6 bg-brand-black/80 backdrop-blur-xl border-b border-white/5">
+        <Magnetic>
+          <Link to="/" className="flex items-center space-x-4 cursor-pointer">
+            <div className="w-10 h-10 bg-brand-blue flex items-center justify-center font-black text-lg tracking-tighter shadow-[0_0_20px_rgba(26,95,255,0.4)] rounded-xl">TG</div>
+            <span className="font-bold tracking-[0.15em] text-sm uppercase">Technicat</span>
+          </Link>
+        </Magnetic>
+        <div className="hidden lg:flex items-center space-x-8 xl:space-x-12 text-xs font-bold tracking-[0.15em] text-zinc-400 uppercase">
+          <Magnetic><a href="/#identity" className="hover:text-white transition-colors block py-2">Identity</a></Magnetic>
+          <Magnetic><a href="/#manufacturing" className="hover:text-white transition-colors block py-2">Manufacturing</a></Magnetic>
+          <Magnetic><Link to="/projects" className="hover:text-white transition-colors block py-2">Projects</Link></Magnetic>
+          <Magnetic><a href="/#technidaq" className="hover:text-brand-blue transition-colors block py-2">Software</a></Magnetic>
+          <Magnetic><Link to="/careers" className="text-white transition-colors block py-2">Careers</Link></Magnetic>
         </div>
-        {menuOpen && (
-          <div style={{ background: "var(--t-card)", borderTop: "1px solid var(--t-border2)", boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}>
-            <div style={{ maxWidth: 1280, margin: "0 auto", padding: "12px 24px 16px" }}>
-              <Link to="/" onClick={() => setMenuOpen(false)} style={{ display: "block", padding: "12px 16px", borderRadius: 10, fontSize: 14, fontWeight: 500, color: "var(--t-fg2)", textDecoration: "none" }}>
-                ← Back to Home
-              </Link>
-            </div>
-          </div>
-        )}
-      </header>
+        <div className="flex items-center space-x-4">
+          <Magnetic>
+            <Link to="/login" className="px-4 py-4 text-xs font-bold tracking-[0.15em] uppercase text-zinc-300 hover:text-white transition-colors block">
+              Portal
+            </Link>
+          </Magnetic>
+          <Magnetic>
+            <button className="px-8 py-4 text-xs font-bold tracking-[0.15em] uppercase bg-white text-black hover:bg-brand-blue hover:text-white transition-colors rounded-xl">
+              Contact
+            </button>
+          </Magnetic>
+        </div>
+      </nav>
 
-      <main>
-        {/* ══════ HERO ══════ */}
-        <section style={{
-          paddingTop: 140, paddingBottom: 80,
-          backgroundImage: dark
-            ? `radial-gradient(ellipse 70% 50% at 50% -5%, rgba(37,99,235,0.14) 0%, transparent 60%), linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)`
-            : `radial-gradient(ellipse 70% 50% at 50% -5%, rgba(37,99,235,0.07) 0%, transparent 60%), linear-gradient(rgba(148,163,184,0.055) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.055) 1px, transparent 1px)`,
-          backgroundSize: "auto, 56px 56px, 56px 56px",
-          textAlign: "center", position: "relative", overflow: "hidden",
-        }}>
-          <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 1, background: "linear-gradient(90deg, transparent, rgba(37,99,235,0.25), transparent)" }} />
-          <div style={{ maxWidth: 800, margin: "0 auto", padding: "0 24px" }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "5px 14px", borderRadius: 999, fontSize: 12, fontWeight: 600, background: "rgba(34,197,94,0.1)", color: "#16a34a", border: "1px solid rgba(34,197,94,0.25)", marginBottom: 24 }}>
-              ● We're Hiring
-            </span>
-            <h1 className="font-display" style={{ fontSize: "clamp(2rem,5vw,3.2rem)", fontWeight: 800, color: "var(--t-fg)", lineHeight: 1.12, letterSpacing: "-0.04em", margin: "0 0 20px" }}>
-              Build What Matters.<br />
-              <span style={{ color: "#2563eb" }}>Join Technicat Group.</span>
+      {/* HERO SECTION */}
+      <section className="relative pt-48 pb-24 z-10">
+        <div className="max-w-7xl mx-auto px-8">
+          <RevealText>
+            <div className="flex items-center space-x-4 mb-8">
+              <div className="w-12 h-[1px] bg-brand-blue"></div>
+              <h2 className="text-xs font-bold tracking-[0.15em] text-brand-blue uppercase">Careers</h2>
+            </div>
+          </RevealText>
+          <RevealText>
+            <h1 className="text-6xl md:text-8xl lg:text-9xl font-black tracking-tighter uppercase drop-shadow-2xl mb-8 leading-[0.9]">
+              Build What <br/>
+              <span className="text-brand-blue drop-shadow-[0_0_40px_rgba(26,95,255,0.4)]">Matters.</span>
             </h1>
-            <p style={{ fontSize: "1.05rem", color: "var(--t-muted)", lineHeight: 1.7, maxWidth: 560, margin: "0 auto 36px" }}>
+          </RevealText>
+          <RevealText>
+            <p className="text-xl md:text-3xl text-zinc-300 font-medium leading-[1.6] max-w-4xl">
               We are engineers, developers, and technicians who design the electrical backbone of Lebanon's critical infrastructure — and build the software intelligence that runs on top of it.
             </p>
-            <a href="#apply" style={{
-              display: "inline-flex", alignItems: "center", gap: 8, padding: "13px 28px", borderRadius: 12,
-              fontSize: 15, fontWeight: 700, background: "#2563eb", color: "#fff", border: "none",
-              cursor: "pointer", boxShadow: "0 0 0 1px rgba(37,99,235,0.15),0 8px 30px rgba(37,99,235,0.25)",
-              transition: "all 0.2s", textDecoration: "none",
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = "#1d4ed8"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = "#2563eb"; e.currentTarget.style.transform = "translateY(0)"; }}>
-              Apply Now <ArrowRight size={16} />
-            </a>
-          </div>
-        </section>
-
-        {/* ══════ OPEN ROLES ══════ */}
-        <section style={{ padding: "80px 0", background: "var(--t-bg2)" }}>
-          <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
-            <div style={{ textAlign: "center", marginBottom: 48 }}>
-              <h2 className="font-display" style={{ fontWeight: 700, fontSize: "clamp(1.5rem,3vw,2rem)", color: "var(--t-fg)", letterSpacing: "-0.03em", margin: "0 0 12px" }}>Open Positions</h2>
-              <p style={{ fontSize: 14, color: "var(--t-muted)", margin: 0 }}>Click a role to pre-fill your application below.</p>
+          </RevealText>
+          <RevealText>
+            <div className="mt-12">
+              <Magnetic>
+                <a href="#apply" className="inline-flex items-center px-10 py-5 bg-brand-blue text-white text-sm font-bold tracking-[0.15em] uppercase rounded-xl hover:bg-blue-600 transition-colors shadow-[0_0_30px_rgba(37,99,235,0.3)]">
+                  Apply Now
+                  <ArrowRight className="w-5 h-5 ml-3" />
+                </a>
+              </Magnetic>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(min(100%,260px),1fr))", gap: 16 }}>
-              {OPEN_ROLES.map((r) => {
-                const isHighlighted = highlight === r.title;
-                return (
-                  <button key={r.title} onClick={() => { setHighlight(r.title); setForm((f) => ({ ...f, role: r.title })); document.getElementById("apply")?.scrollIntoView({ behavior: "smooth" }); }} style={{
-                    borderRadius: 16, padding: "22px 22px", textAlign: "left", cursor: "pointer",
-                    background: isHighlighted ? `${r.accent}12` : "var(--t-card)",
-                    border: `1.5px solid ${isHighlighted ? r.accent + "45" : "var(--t-border)"}`,
-                    boxShadow: isHighlighted ? `0 0 0 3px ${r.accent}15` : "0 1px 2px rgba(0,0,0,0.04)",
-                    transition: "all 0.2s",
-                  }}
-                    onMouseEnter={(e) => { if (!isHighlighted) { e.currentTarget.style.borderColor = r.accent + "45"; e.currentTarget.style.transform = "translateY(-2px)"; } }}
-                    onMouseLeave={(e) => { if (!isHighlighted) { e.currentTarget.style.borderColor = dark ? "#334155" : "#e2e8f0"; e.currentTarget.style.transform = "translateY(0)"; } }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
-                      <div style={{ width: 42, height: 42, borderRadius: 12, background: `${r.accent}18`, border: `1.5px solid ${r.accent}30`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <r.Icon size={20} style={{ color: r.accent }} />
+          </RevealText>
+        </div>
+      </section>
+
+      {/* OPEN ROLES */}
+      <section className="relative z-10 py-24 border-t border-white/5 bg-brand-black/50 backdrop-blur-md roles-grid">
+        <div className="max-w-7xl mx-auto px-8">
+          <div className="mb-16">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase mb-4">Open Positions</h2>
+            <p className="text-zinc-400 text-lg">Click a role to pre-fill your application below.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {OPEN_ROLES.map((r) => {
+              const isHighlighted = highlight === r.title;
+              return (
+                <div key={r.title} className="role-card opacity-0 translate-y-10">
+                  <button
+                    onClick={() => {
+                      setHighlight(r.title);
+                      setForm((f) => ({ ...f, role: r.title }));
+                      document.getElementById("apply")?.scrollIntoView({ behavior: "smooth" });
+                    }}
+                    className={`w-full text-left p-8 rounded-3xl border transition-all duration-300 relative overflow-hidden group ${
+                      isHighlighted
+                        ? 'bg-brand-blue/10 border-brand-blue shadow-[0_0_30px_rgba(37,99,235,0.15)]'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-brand-blue/10 blur-[40px] rounded-full group-hover:bg-brand-blue/20 transition-colors duration-700"></div>
+
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-6">
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center border transition-colors ${
+                          isHighlighted ? 'bg-brand-blue/20 border-brand-blue/50 text-brand-blue' : 'bg-white/5 border-white/10 text-zinc-400 group-hover:text-brand-blue group-hover:border-brand-blue/30'
+                        }`}>
+                          <r.Icon size={24} />
+                        </div>
+                        <span className={`px-4 py-2 rounded-xl text-[10px] font-bold tracking-[0.15em] uppercase border ${
+                          isHighlighted ? 'bg-brand-blue/20 border-brand-blue/50 text-brand-blue' : 'bg-white/5 border-white/10 text-zinc-400'
+                        }`}>
+                          {r.type}
+                        </span>
                       </div>
-                      <span style={{ fontSize: 10, fontWeight: 700, padding: "3px 9px", borderRadius: 999, background: `${r.accent}15`, color: r.accent, border: `1px solid ${r.accent}30`, letterSpacing: "0.07em", textTransform: "uppercase" as const }}>{r.type}</span>
+
+                      <div className="text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-500 mb-2">{r.dept}</div>
+                      <h3 className={`text-2xl font-black tracking-tighter uppercase mb-4 transition-colors ${
+                        isHighlighted ? 'text-brand-blue' : 'text-white'
+                      }`}>{r.title}</h3>
+                      <p className="text-zinc-400 leading-relaxed">{r.desc}</p>
                     </div>
-                    <div style={{ fontSize: 10, fontWeight: 600, color: "var(--t-muted2)", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 4 }}>{r.dept}</div>
-                    <div className="font-display" style={{ fontWeight: 700, fontSize: "0.95rem", color: "var(--t-fg)", marginBottom: 8 }}>{r.title}</div>
-                    <p style={{ fontSize: 12, color: "var(--t-muted)", lineHeight: 1.6, margin: 0 }}>{r.desc}</p>
                   </button>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-
-        {/* ══════ APPLICATION FORM ══════ */}
-        <section id="apply" style={{ padding: "80px 0", background: "var(--t-bg)" }}>
-          <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 24px" }}>
-            <div style={{ textAlign: "center", marginBottom: 40 }}>
-              <h2 className="font-display" style={{ fontWeight: 700, fontSize: "clamp(1.5rem,3vw,2rem)", color: "var(--t-fg)", letterSpacing: "-0.03em", margin: "0 0 12px" }}>Apply Now</h2>
-              <p style={{ fontSize: 14, color: "var(--t-muted)", margin: 0 }}>Fill in your details. Your email client will open with a pre-written application — remember to attach your CV before sending.</p>
-            </div>
-
-            {submitted && (
-              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "16px 20px", borderRadius: 12, background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.3)", marginBottom: 24 }}>
-                <span style={{ fontSize: 20, lineHeight: 1 }}>📎</span>
-                <div>
-                  <p style={{ fontWeight: 600, color: "#b45309", margin: "0 0 4px", fontSize: 14 }}>Email client opened!</p>
-                  <p style={{ fontSize: 13, color: "#92400e", margin: 0 }}>Please <strong>attach your CV / Resume</strong> to the email before clicking Send.</p>
                 </div>
-              </div>
-            )}
-
-            <div style={{ background: "var(--t-card)", borderRadius: 20, padding: "36px 36px", border: "1px solid var(--t-border2)", boxShadow: "0 1px 2px rgba(0,0,0,0.04),0 8px 32px rgba(0,0,0,0.06)" }}>
-              <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(100%,220px),1fr))", gap: 16 }}>
-                  <div>
-                    <label style={labelStyle}>Full Name</label>
-                    <input
-                      className="careers-input"
-                      type="text" required placeholder="John Smith"
-                      value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                      style={inputStyle}
-                      onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.08)"; }}
-                      onBlur={(e) => { e.target.style.borderColor = dark ? "#334155" : "#e2e8f0"; e.target.style.boxShadow = "none"; }} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Email Address</label>
-                    <input
-                      className="careers-input"
-                      type="email" required placeholder="john@company.com"
-                      value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                      style={inputStyle}
-                      onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.08)"; }}
-                      onBlur={(e) => { e.target.style.borderColor = dark ? "#334155" : "#e2e8f0"; e.target.style.boxShadow = "none"; }} />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Position Applying For</label>
-                  <select
-                    value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} required
-                    style={{ ...inputStyle, cursor: "pointer" }}>
-                    {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Cover Letter</label>
-                  <textarea
-                    className="careers-input"
-                    required rows={6}
-                    placeholder="Tell us about yourself, your experience, and why you want to join Technicat Group..."
-                    value={form.letter} onChange={(e) => setForm((f) => ({ ...f, letter: e.target.value }))}
-                    style={{ ...inputStyle, resize: "vertical", minHeight: 120 }}
-                    onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.08)"; }}
-                    onBlur={(e) => { e.target.style.borderColor = dark ? "#334155" : "#e2e8f0"; e.target.style.boxShadow = "none"; }} />
-                </div>
-
-                <div>
-                  <label style={labelStyle}>CV / Resume</label>
-                  <label style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: "12px 14px", borderRadius: 10,
-                    border: "1.5px dashed var(--t-border)", background: "var(--t-bg2)", cursor: "pointer",
-                    transition: "border-color 0.2s",
-                  }}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#93c5fd"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.borderColor = dark ? "#334155" : "#e2e8f0"; }}>
-                    <input type="file" accept=".pdf,.doc,.docx" style={{ display: "none" }}
-                      onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)} />
-                    <div style={{ width: 36, height: 36, borderRadius: 9, background: "var(--t-blue-tint)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                      <Users size={16} style={{ color: "#2563eb" }} />
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--t-fg2)", margin: 0 }}>
-                        {fileName ?? "Click to upload CV / Resume"}
-                      </p>
-                      <p style={{ fontSize: 11, color: "var(--t-muted2)", margin: 0 }}>PDF, DOC, DOCX</p>
-                    </div>
-                  </label>
-                  <p style={{ fontSize: 11, color: "var(--t-muted2)", marginTop: 6, marginBottom: 0 }}>
-                    Your email client will open — attach this file before sending.
-                  </p>
-                </div>
-
-                <button type="submit" style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                  padding: "14px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-                  background: "linear-gradient(135deg, #2563eb, #1d4ed8)", color: "#fff",
-                  border: "none", cursor: "pointer",
-                  boxShadow: "0 0 0 1px rgba(37,99,235,0.2),0 8px 30px rgba(37,99,235,0.3)",
-                  transition: "all 0.2s", marginTop: 4,
-                }}
-                  onMouseEnter={(e) => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 0 0 1px rgba(37,99,235,0.25),0 12px 40px rgba(37,99,235,0.4)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 0 0 1px rgba(37,99,235,0.2),0 8px 30px rgba(37,99,235,0.3)"; }}>
-                  {submitted ? <><Check size={16} /> Application Sent — Attach Your CV!</> : <>Submit Application <ArrowRight size={16} /></>}
-                </button>
-              </form>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* ══════ FOOTER ══════ */}
-      <footer style={{ background: "#0f172a", color: "#fff", padding: "40px 0 24px" }}>
-        <div style={{ maxWidth: 1280, margin: "0 auto", padding: "0 24px" }}>
-          <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 20, marginBottom: 24 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <div style={{ width: 28, height: 28, borderRadius: 7, background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Zap size={14} color="#fff" strokeWidth={2.5} />
-              </div>
-              <span style={{ fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 700, fontSize: "0.95rem" }}>
-                Technicat<span style={{ color: "#60a5fa" }}>Group</span>
-              </span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-              {[
-                { Icon: MapPin,   text: "New Rawda, Beirut, Lebanon" },
-                { Icon: Mail,     text: "joesfeir007@gmail.com", href: "mailto:joesfeir007@gmail.com" },
-              ].map((c) => (
-                <div key={c.text} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "rgba(255,255,255,0.38)" }}>
-                  <c.Icon size={13} />
-                  {c.href ? <a href={c.href} style={{ color: "rgba(255,255,255,0.38)", textDecoration: "none" }}>{c.text}</a> : c.text}
-                </div>
-              ))}
-              <a href="https://www.linkedin.com/company/technicat-group/about/?viewAsMember=true" target="_blank" rel="noopener noreferrer"
-                style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12, color: "rgba(255,255,255,0.38)", textDecoration: "none", transition: "color 0.15s" }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#60a5fa")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.38)")}>
-                <Linkedin size={13} /> LinkedIn
-              </a>
-            </div>
-          </div>
-          <div style={{ paddingTop: 20, borderTop: "1px solid rgba(255,255,255,0.07)", display: "flex", flexWrap: "wrap", justifyContent: "space-between", gap: 12 }}>
-            <p style={{ fontSize: 12, color: "rgba(255,255,255,0.25)", margin: 0 }}>&copy; {new Date().getFullYear()} Technicat Group. All rights reserved.</p>
-            <Link to="/" style={{ fontSize: 12, color: "rgba(255,255,255,0.38)", textDecoration: "none", transition: "color 0.15s" }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#60a5fa")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.38)")}>← Back to Home</Link>
+              );
+            })}
           </div>
         </div>
-      </footer>
+      </section>
 
-      {scrolled && (
-        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Scroll to top" style={{ position: "fixed", bottom: 24, right: 24, zIndex: 40, width: 40, height: 40, borderRadius: "50%", background: "#2563eb", color: "#fff", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 0 1px rgba(37,99,235,0.15),0 8px 30px rgba(37,99,235,0.3)", transition: "all 0.2s" }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = "#1d4ed8"; e.currentTarget.style.transform = "translateY(-2px)"; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = "#2563eb"; e.currentTarget.style.transform = "translateY(0)"; }}>
-          <ChevronUp size={18} />
-        </button>
-      )}
-    </>
-  );
+      {/* APPLICATION FORM */}
+      <section id="apply" className="relative z-10 py-32 border-t border-white/5 bg-brand-black">
+        <div className="max-w-3xl mx-auto px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tighter uppercase mb-4">Apply Now</h2>
+            <p className="text-zinc-400 text-lg">Fill in your details. Your email client will open with a pre-written application — remember to attach your CV before sending.</p>
+          </div>
+
+          {submitted && (
+            <div className="mb-8 p-6 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-4">
+              <span className="text-2xl">📎</span>
+              <div>
+                <p className="text-amber-500 font-bold mb-1">Email client opened!</p>
+                <p className="text-amber-500/80 text-sm">Please <strong>attach your CV / Resume</strong> to the email before clicking Send.</p>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 md:p-12 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-brand-blue/5 blur-[80px] rounded-full"></div>
+
+            <form onSubmit={handleSubmit} className="relative z-10 flex flex-col gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div>
+                  <label className="block text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-500 mb-3">Full Name</label>
+                  <input
+                    type="text" required placeholder="John Smith"
+                    value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    className="w-full bg-black/50 border border-white/10 rounded-xl px-5 py-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-500 mb-3">Email Address</label>
+                  <input
+                    type="email" required placeholder="john@company.com"
+                    value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                    className="w-full bg-black/50 border border-white/10 rounded-xl px-5 py-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-500 mb-3">Position Applying For</label>
+                <select
+                  value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))} required
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-5 py-4 text-white focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue transition-all appearance-none cursor-pointer"
+                >
+                  {ROLES.map((r) => <option key={r} value={r} className="bg-brand-black text-white">{r}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-500 mb-3">Cover Letter</label>
+                <textarea
+                  required rows={6}
+                  placeholder="Tell us about yourself, your experience, and why you want to join Technicat Group..."
+                  value={form.letter} onChange={(e) => setForm((f) => ({ ...f, letter: e.target.value }))}
+                  className="w-full bg-black/50 border border-white/10 rounded-xl px-5 py-4 text-white placeholder:text-zinc-600 focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue transition-all resize-y min-h-[150px]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold tracking-[0.2em] uppercase text-zinc-500 mb-3">CV / Resume</label>
+                <label className="flex items-center gap-4 p-5 rounded-xl border border-dashed border-white/20 bg-black/30 hover:bg-white/5 hover:border-brand-blue/50 cursor-pointer transition-all group">
+                  <input type="file" accept=".pdf,.doc,.docx" className="hidden"
+                    onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)} />
+                  <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center shrink-0 group-hover:bg-brand-blue/10 group-hover:text-brand-blue group-hover:border-brand-blue/30 transition-colors">
+                    <Users size={20} className="text-zinc-400 group-hover:text-brand-blue transition-colors" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-white mb-1">
+                      {fileName ?? "Click to upload CV / Resume"}
+                    </p>
+                    <p className="text-xs text-zinc-500">PDF, DOC, DOCX</p>
+                  </div>
+                </label>
+                <p className="text-xs text-zinc-500 mt-3">
+                  Your email client will open — attach this file before sending.
+                </p>
+              </div>
+
+              <Magnetic>
+                <button type="submit" className="w-full flex items-center justify-center gap-3 px-8 py-5 bg-brand-blue text-white text-sm font-bold tracking-[0.15em] uppercase rounded-xl hover:bg-blue-600 transition-colors shadow-[0_0_30px_rgba(37,99,235,0.3)] mt-4">
+                  {submitted ? <><Check size={18} /> Application Sent — Attach Your CV!</> : <>Submit Application <ArrowRight size={18} /></>}
+                </button>
+              </Magnetic>
+            </form>
+          </div>
+        </div>
+      </section>
+
+<footer className="bg-brand-black relative z-10 border-t border-white/5 pt-32 pb-12">
+  <div className="max-w-7xl mx-auto px-8">
+    <div className="border-t border-white/10 pt-10 flex flex-col md:flex-row items-center justify-between text-xs font-bold tracking-[0.15em] text-zinc-600 uppercase">
+      <div className="flex items-center space-x-4 mb-6 md:mb-0">
+        <div className="w-8 h-8 bg-brand-blue flex items-center justify-center text-white text-sm rounded-xl">TG</div>
+        <span>&copy; 2026 Technicat Group</span>
+      </div>
+      <div className="flex space-x-8">
+        <Magnetic><a href="#" className="hover:text-white transition-colors p-2">LinkedIn</a></Magnetic>
+        <Magnetic><a href="#" className="hover:text-white transition-colors p-2">Privacy</a></Magnetic>
+        <Magnetic><a href="#" className="hover:text-white transition-colors p-2">Terms</a></Magnetic>
+      </div>
+    </div>
+  </div>
+</footer>
+</div>
+);
 }

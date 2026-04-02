@@ -88,6 +88,8 @@ export default function Landing() {
 
   const [activeProject, setActiveProject] = useState(projects[0].id);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [loadProgress, setLoadProgress] = useState(0);
+  const [barVisible, setBarVisible] = useState(true);
 
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const overlaysContainerRef = useRef<HTMLDivElement>(null);
@@ -129,17 +131,38 @@ export default function Landing() {
   };
 
   useEffect(() => {
+    if (loadProgress >= 165) {
+      const t = setTimeout(() => setBarVisible(false), 600);
+      return () => clearTimeout(t);
+    }
+  }, [loadProgress]);
+
+  useEffect(() => {
     if (isMobile) return;
-    const images: HTMLImageElement[] = [];
-    for (let i = 1; i <= 165; i++) {
+    const TOTAL = 165;
+    let loadedCount = 0;
+    const images: HTMLImageElement[] = new Array(TOTAL);
+
+    const loadFrame = (i: number) => {
       const img = new Image();
       const frameNumber = i.toString().padStart(4, '0');
       img.onload = () => {
+        loadedCount++;
+        setLoadProgress(loadedCount);
         if (i === 1 && canvasRef.current) drawFrame(0, canvasRef.current, img);
       };
-      img.src = `/frame_${frameNumber}.jpg`;
-      images.push(img);
+      img.src = `/frame_${frameNumber}.webp`;
+      images[i - 1] = img;
+    };
+
+    // Priority: frame 1 first, then keyframes at 25/50/75/100%, then the rest
+    const priority = [1, 42, 83, 124, 165];
+    const prioritySet = new Set(priority);
+    priority.forEach(loadFrame);
+    for (let i = 1; i <= TOTAL; i++) {
+      if (!prioritySet.has(i)) loadFrame(i);
     }
+
     imagesRef.current = images;
     return () => { imagesRef.current = []; };
   }, [isMobile]);
@@ -166,8 +189,13 @@ export default function Landing() {
           const images = imagesRef.current;
           if (canvas && images.length > 0) {
             const frameIndex = Math.min(images.length - 1, Math.floor(progress * images.length));
-            if (lastDrawnFrame.current !== frameIndex && images[frameIndex]?.complete) {
-              drawFrame(frameIndex, canvas, images[frameIndex]);
+            if (lastDrawnFrame.current !== frameIndex) {
+              // Find nearest loaded frame at or before target
+              let drawIndex = frameIndex;
+              while (drawIndex > 0 && !images[drawIndex]?.complete) drawIndex--;
+              if (images[drawIndex]?.complete && lastDrawnFrame.current !== drawIndex) {
+                drawFrame(drawIndex, canvas, images[drawIndex]);
+              }
             }
           }
         }
@@ -268,6 +296,22 @@ export default function Landing() {
 
   return (
     <div ref={mainRef} className="min-h-screen bg-brand-black text-white font-sans selection:bg-brand-blue/30 relative">
+
+      {/* Thin loading progress bar */}
+      {!isMobile && barVisible && (
+        <div style={{
+          position: "fixed",
+          top: 0,
+          left: 0,
+          width: `${(loadProgress / 165) * 100}%`,
+          height: "3px",
+          background: "#1a5fff",
+          zIndex: 9999,
+          transition: "width 0.2s ease, opacity 0.5s ease",
+          opacity: loadProgress >= 165 ? 0 : 1,
+          pointerEvents: "none",
+        }} />
+      )}
 
       {/* Background Grid - Replaces the custom cursor and particles */}
       <BackgroundGrid />
