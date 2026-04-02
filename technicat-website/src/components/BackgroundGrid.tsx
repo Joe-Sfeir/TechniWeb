@@ -46,8 +46,8 @@ export const BackgroundGrid = () => {
 
       update(time: number) {
         // 1. Base organic wave motion
-        const waveX = Math.sin(time * 0.001 + this.row * 0.5) * 5;
-        const waveY = Math.cos(time * 0.001 + this.col * 0.5) * 5;
+        const waveX = Math.sin(time * 0.0005 + this.row * 0.5) * 5;
+        const waveY = Math.cos(time * 0.0005 + this.col * 0.5) * 5;
 
         // 2. Scroll distortion (vertical stretch/compression)
         const scrollOffset = currentScrollVelocity * (Math.sin(this.col * 0.5) * 0.5 + 0.5);

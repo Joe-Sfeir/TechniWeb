@@ -9,6 +9,7 @@ gsap.registerPlugin(ScrollTrigger);
 
 import { BackgroundGrid } from '../components/BackgroundGrid';
 
+
 // Magnetic effect for buttons and links
 const Magnetic = ({ children, className }: { children: ReactNode, className?: string }) => {
   const ref = useRef<HTMLDivElement>(null);
@@ -77,8 +78,6 @@ const projects = [
   { id: 3, title: 'Data Center Omega', category: 'Power Monitoring', spec: 'Tier IV ATS' },
 ];
 
-const TOTAL_FRAMES = 165;
-
 export default function Landing() {
   const mainRef = useRef<HTMLDivElement>(null);
   const heroRef = useRef<HTMLDivElement>(null);
@@ -89,7 +88,6 @@ export default function Landing() {
 
   const [activeProject, setActiveProject] = useState(projects[0].id);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const [framesLoaded, setFramesLoaded] = useState(0);
 
   const videoContainerRef = useRef<HTMLDivElement>(null);
   const overlaysContainerRef = useRef<HTMLDivElement>(null);
@@ -99,10 +97,9 @@ export default function Landing() {
   const textOverlayRef = useRef<HTMLDivElement>(null);
   const scrollIndicatorRef = useRef<HTMLDivElement>(null);
 
+
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -110,23 +107,15 @@ export default function Landing() {
   const drawFrame = (frameIndex: number, canvas: HTMLCanvasElement, img: HTMLImageElement) => {
     const ctx = canvas.getContext('2d');
     if (!ctx || !img.complete || img.naturalWidth === 0) return;
-
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-
     if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
     }
-
     const imgRatio = img.width / img.height;
     const canvasRatio = canvas.width / canvas.height;
-
-    let drawWidth = canvas.width;
-    let drawHeight = canvas.height;
-    let offsetX = 0;
-    let offsetY = 0;
-
+    let drawWidth = canvas.width, drawHeight = canvas.height, offsetX = 0, offsetY = 0;
     if (imgRatio > canvasRatio) {
       drawWidth = canvas.height * imgRatio;
       offsetX = (canvas.width - drawWidth) / 2;
@@ -134,7 +123,6 @@ export default function Landing() {
       drawHeight = canvas.width / imgRatio;
       offsetY = (canvas.height - drawHeight) / 2;
     }
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
     lastDrawnFrame.current = frameIndex;
@@ -142,30 +130,18 @@ export default function Landing() {
 
   useEffect(() => {
     if (isMobile) return;
-
     const images: HTMLImageElement[] = [];
-
-    for (let i = 1; i <= TOTAL_FRAMES; i++) {
+    for (let i = 1; i <= 165; i++) {
       const img = new Image();
       const frameNumber = i.toString().padStart(4, '0');
-      const capturedIndex = i;
-
       img.onload = () => {
-        setFramesLoaded(prev => prev + 1);
-        if (capturedIndex === 1 && canvasRef.current) {
-          drawFrame(1, canvasRef.current, img);
-        }
+        if (i === 1 && canvasRef.current) drawFrame(0, canvasRef.current, img);
       };
-      img.src = `/frame_${frameNumber}.webp`;
-
+      img.src = `/frame_${frameNumber}.jpg`;
       images.push(img);
     }
-
     imagesRef.current = images;
-
-    return () => {
-      imagesRef.current = [];
-    };
+    return () => { imagesRef.current = []; };
   }, [isMobile]);
 
   useEffect(() => {
@@ -184,17 +160,13 @@ export default function Landing() {
         let progress = (scrollY - sectionTop) / (sectionHeight - viewportHeight);
         progress = Math.max(0, Math.min(1, progress));
 
+        // Scrub canvas frames with scroll (desktop)
         if (!isMobile) {
           const canvas = canvasRef.current;
           const images = imagesRef.current;
-
-          if (canvas && images.length === TOTAL_FRAMES) {
-            const frameIndex = Math.min(
-              TOTAL_FRAMES - 1,
-              Math.floor(progress * TOTAL_FRAMES)
-            );
-
-            if (lastDrawnFrame.current !== frameIndex && images[frameIndex]) {
+          if (canvas && images.length > 0) {
+            const frameIndex = Math.min(images.length - 1, Math.floor(progress * images.length));
+            if (lastDrawnFrame.current !== frameIndex && images[frameIndex]?.complete) {
               drawFrame(frameIndex, canvas, images[frameIndex]);
             }
           }
@@ -331,37 +303,6 @@ export default function Landing() {
 
       {/* 1. HERO - Full Page Scroll-Driven Assembly */}
       <section ref={heroRef} style={{ height: "400vh", position: "relative" }}>
-        {/* Loading State for Desktop */}
-        {!isMobile && framesLoaded < TOTAL_FRAMES && (
-          <div style={{
-            position: "sticky",
-            top: 0,
-            left: 0,
-            width: "100%",
-            height: "100vh",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "transparent",
-            zIndex: 50,
-            color: "white"
-          }}>
-            <div className="text-xs font-bold tracking-[0.2em] uppercase mb-4 text-brand-blue">
-              Initializing Systems
-            </div>
-            <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-brand-blue transition-all duration-300"
-                style={{ width: `${(framesLoaded / TOTAL_FRAMES) * 100}%` }}
-              />
-            </div>
-            <div className="text-[10px] font-mono mt-4 text-zinc-500">
-              {Math.round((framesLoaded / TOTAL_FRAMES) * 100)}%
-            </div>
-          </div>
-        )}
-
         {/* Video/Canvas Container (Blended) */}
         <div
           ref={videoContainerRef}
@@ -375,7 +316,7 @@ export default function Landing() {
             mixBlendMode: "screen",
             pointerEvents: "none",
             zIndex: 1,
-            marginTop: (!isMobile && framesLoaded < TOTAL_FRAMES) ? "-100vh" : "0"
+            marginTop: "0"
           }}
         >
           {isMobile ? (
