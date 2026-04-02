@@ -97,7 +97,6 @@ interface TelemetryRow {
 }
 
 type ChartPoint    = Record<string, string | number>;
-type Theme         = "dark" | "light";
 type ViewMode      = "chart" | "grid";
 type ThresholdMap  = Record<string, Record<string, { min: number | null; max: number | null }>>;
 
