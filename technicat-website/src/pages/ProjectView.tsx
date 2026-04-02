@@ -7,6 +7,7 @@ import {
 import { ChevronLeft, Sun, Moon, LogOut, Download, Settings, X, Plus, Trash2, Check } from "lucide-react";
 import { getToken, handleAuthError } from "../lib/auth";
 import { API_URL } from "../config";
+import { useTheme } from "../context/ThemeContext";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -96,7 +97,6 @@ interface TelemetryRow {
 }
 
 type ChartPoint    = Record<string, string | number>;
-type Theme         = "dark" | "light";
 type ViewMode      = "chart" | "grid";
 type ThresholdMap  = Record<string, Record<string, { min: number | null; max: number | null }>>;
 
@@ -383,7 +383,7 @@ export default function ProjectView() {
   const location    = useLocation();
   const backTo      = (location.state as { from?: string } | null)?.from ?? "/dashboard";
 
-  const [theme,       setTheme]       = useState<Theme>("dark");
+  const { dark: darkCtx, toggle: toggleTheme } = useTheme();
   const [activeTab,   setActiveTab]   = useState("");
   const [devices,     setDevices]     = useState<string[]>([]);
   const [allVars,     setAllVars]     = useState<string[]>([]);
@@ -416,7 +416,7 @@ export default function ProjectView() {
   const [busCfgSuccess,   setBusCfgSuccess]   = useState<string | null>(null);
 
   const lastTimestampRef = useRef<string | null>(null);
-  const isDark           = theme === "dark";
+  const isDark           = darkCtx;
 
   // ── CSS injection ──
   useEffect(() => {
@@ -857,7 +857,7 @@ export default function ProjectView() {
 
   if (loading) {
     return (
-      <div data-theme={theme} className="scada-page" style={{ height: "100svh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div data-theme={isDark ? "dark" : "light"} className="scada-page" style={{ height: "100svh", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={CLR.blue} strokeWidth={2.5} style={{ animation: "spin-login 1s linear infinite" }}>
           <path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round" />
         </svg>
@@ -866,7 +866,7 @@ export default function ProjectView() {
   }
 
   return (
-    <div data-theme={theme} className="scada-page" style={{ height: "100svh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div data-theme={isDark ? "dark" : "light"} className="scada-page" style={{ height: "100svh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
 
       {/* ══ Header ══ */}
       <header style={{ display: "flex", alignItems: "center", gap: "14px", padding: "0 20px", height: "58px", flexShrink: 0, background: CLR.bgHeader(isDark), borderBottom: `1px solid ${CLR.border(isDark)}`, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", position: "relative", zIndex: 10 }}>
@@ -931,7 +931,7 @@ export default function ProjectView() {
           </button>
 
           {/* Theme */}
-          <button onClick={() => setTheme((t) => t === "dark" ? "light" : "dark")} style={{ ...ctrlBtn(), padding: "0 10px" }}>
+          <button onClick={toggleTheme} style={{ ...ctrlBtn(), padding: "0 10px" }}>
             {isDark ? <Sun size={14} /> : <Moon size={14} />}
           </button>
 
