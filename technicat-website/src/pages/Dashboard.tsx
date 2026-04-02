@@ -6,7 +6,7 @@ import { useTheme } from "../context/ThemeContext";
 import {
   Zap, LogOut, Building2, Hospital, Server, Factory,
   Activity, ChevronRight, AlertTriangle, RefreshCw,
-  LayoutDashboard, Bell, Settings, Globe, Sun, Moon, Menu,
+  LayoutDashboard, Bell, Settings, Globe, Sun, Moon, Menu, X,
 } from "lucide-react";
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */

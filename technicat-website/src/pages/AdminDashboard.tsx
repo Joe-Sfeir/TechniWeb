@@ -1,15 +1,14 @@
 import { useState, useEffect, Fragment } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus, Search, Send, Cpu, PlusCircle, Trash2, Upload, Sun, Moon } from "lucide-react";
+import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus, Search, Send, Cpu, PlusCircle, Trash2, Upload } from "lucide-react";
 import { getToken, getRole, clearAuth, handleAuthError } from "../lib/auth";
-import { useTheme } from "../context/ThemeContext";
 
 import { API_URL } from "../config";
 const API_BASE = API_URL;
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
-const LIGHT_CLR = {
+const CLR = {
   bg:        "#f1f5f9",
   surface:   "#ffffff",
   border:    "#e2e8f0",
@@ -30,38 +29,26 @@ const LIGHT_CLR = {
   sidebar:   "#ffffff",
 };
 
-const DARK_CLR = {
-  bg:        "#0f172a",
-  surface:   "#1e293b",
-  border:    "#334155",
-  accent:    "#3b82f6",
-  accentDim: "#1e3a5f",
-  text:      "#f1f5f9",
-  muted:     "#94a3b8",
-  muted2:    "#64748b",
-  danger:    "#f87171",
-  dangerBg:  "#2d1515",
-  dangerBdr: "#7f1d1d",
-  amber:     "#fbbf24",
-  amberBg:   "#2d2000",
-  amberBdr:  "#78350f",
-  green:     "#4ade80",
-  greenBg:   "#052e16",
-  greenBdr:  "#14532d",
-  sidebar:   "#1e293b",
-};
-
-// module-level fallback (for lookup tables that don't need dynamic theming)
-const CLR = LIGHT_CLR;
-
-const card = (extra?: CSSProperties, clr = LIGHT_CLR): CSSProperties => ({
-  background: clr.surface,
-  border: `1px solid ${clr.border}`,
+const card = (extra?: CSSProperties): CSSProperties => ({
+  background: "#ffffff",
+  border: `1px solid ${CLR.border}`,
   borderRadius: 12,
-  boxShadow: clr === DARK_CLR ? "0 1px 3px rgba(0,0,0,0.3)" : "0 1px 3px rgba(0,0,0,0.05)",
+  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
   ...extra,
 });
 
+const DOT_GRID = `
+  *,*::before,*::after { box-sizing: border-box; }
+  body { margin: 0; }
+  .admin-bg {
+    background-color: ${CLR.bg};
+    background-image: radial-gradient(circle, rgba(37,99,235,0.06) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+  .admin-fade { animation: fadeIn 0.3s ease both; }
+  @keyframes spin-admin { to { transform:rotate(360deg); } }
+`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Project {
@@ -217,23 +204,19 @@ function Spinner() {
 }
 
 function SectionHeader({ title, sub }: { title: string; sub?: string }) {
-  const { dark } = useTheme();
-  const C = dark ? DARK_CLR : LIGHT_CLR;
   return (
     <div style={{ marginBottom: 24 }}>
-      <h2 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 20, color: C.text, letterSpacing: "-0.02em", margin: 0 }}>{title}</h2>
-      {sub && <p style={{ fontSize: 13, color: C.muted, marginTop: 4, marginBottom: 0 }}>{sub}</p>}
+      <h2 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 20, color: CLR.text, letterSpacing: "-0.02em", margin: 0 }}>{title}</h2>
+      {sub && <p style={{ fontSize: 13, color: CLR.muted, marginTop: 4, marginBottom: 0 }}>{sub}</p>}
     </div>
   );
 }
 
 function DemoBanner() {
-  const { dark } = useTheme();
-  const C = dark ? DARK_CLR : LIGHT_CLR;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: C.amberBg, border: `1px solid ${C.amberBdr}`, borderRadius: 8, marginBottom: 20, fontSize: 13 }}>
-      <span style={{ fontWeight: 600, color: C.amber }}>Demo mode</span>
-      <span style={{ color: C.muted }}>— backend offline, showing sample data</span>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", background: CLR.amberBg, border: `1px solid ${CLR.amberBdr}`, borderRadius: 8, marginBottom: 20, fontSize: 13 }}>
+      <span style={{ fontWeight: 600, color: CLR.amber }}>Demo mode</span>
+      <span style={{ color: CLR.muted }}>— backend offline, showing sample data</span>
     </div>
   );
 }
@@ -241,12 +224,6 @@ function DemoBanner() {
 // ─── Fleet Tab ────────────────────────────────────────────────────────────────
 function FleetTab() {
   const navigate = useNavigate();
-  const { dark } = useTheme();
-  const CLR = dark ? DARK_CLR : LIGHT_CLR;
-  const card = (extra?: CSSProperties): CSSProperties => ({
-    background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 12,
-    boxShadow: dark ? "0 1px 3px rgba(0,0,0,0.3)" : "0 1px 3px rgba(0,0,0,0.05)", ...extra,
-  });
   const [projects,  setProjects]  = useState<Project[]>([]);
   const [users,     setUsers]     = useState<User[]>([]);
   const [demo,      setDemo]      = useState(false);
@@ -350,8 +327,8 @@ function FleetTab() {
   const assigned   = projects.filter((p) => p.clients.length > 0  && (!fleetQ || p.name.toLowerCase().includes(fleetQ)));
   const unassigned = projects.filter((p) => p.clients.length === 0 && (!fleetQ || p.name.toLowerCase().includes(fleetQ)));
 
-  const thStyle: CSSProperties = { textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", borderBottom: `1px solid ${CLR.border}`, background: CLR.bg };
-  const tdStyle: CSSProperties = { padding: "12px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid ${CLR.border}` };
+  const thStyle: CSSProperties = { textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", borderBottom: `1px solid ${CLR.border}`, background: "#f8fafc" };
+  const tdStyle: CSSProperties = { padding: "12px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9` };
 
   return (
     <div className="admin-fade">
@@ -364,7 +341,7 @@ function FleetTab() {
           value={fleetSearch}
           onChange={(e) => setFleetSearch(e.target.value)}
           placeholder="Search projects…"
-          style={{ width: "100%", padding: "8px 12px 8px 32px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: CLR.surface, color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
+          style={{ width: "100%", padding: "8px 12px 8px 32px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#fff", color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
           onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
           onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }}
         />
@@ -438,7 +415,7 @@ function FleetTab() {
                       <select
                         value={assignSel[p.id] ?? ""}
                         onChange={(e) => setAssignSel((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                        style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CLR.border}`, background: CLR.bg, color: assignSel[p.id] ? CLR.text : CLR.muted, fontSize: 13, outline: "none", cursor: "pointer", minWidth: 160 }}
+                        style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: assignSel[p.id] ? CLR.text : CLR.muted, fontSize: 13, outline: "none", cursor: "pointer", minWidth: 160 }}
                       >
                         <option value="" disabled>Add client…</option>
                         {users.filter((u) => !p.clients.some((c) => String(c.id) === String(u.id))).map((u) => (
@@ -483,13 +460,13 @@ function FleetTab() {
                 <thead>
                   <tr>
                     {["Project", "Tier", "Status", "Devices", "Nodes", "Activations", "Last Seen", "", "Assign To", ""].map((h) => (
-                      <th key={h} style={{ ...thStyle, background: dark ? CLR.bg : "#fffbeb" }}>{h}</th>
+                      <th key={h} style={{ ...thStyle, background: "#fffbeb" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {unassigned.map((p) => (
-                    <tr key={p.id} style={{ background: dark ? CLR.surface : "#fffdf5" }}>
+                    <tr key={p.id} style={{ background: "#fffdf5" }}>
                       <td style={{ ...tdStyle, fontWeight: 500 }}>{p.name}</td>
                       <td style={tdStyle}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}14`, padding: "2px 8px", borderRadius: 5, border: `1px solid ${TIER_COLOR[p.tier] ?? CLR.muted}28` }}>
@@ -518,7 +495,7 @@ function FleetTab() {
                         <select
                           value={assignSel[p.id] ?? ""}
                           onChange={(e) => setAssignSel((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                          style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CLR.border}`, background: CLR.bg, color: assignSel[p.id] ? CLR.text : CLR.muted, fontSize: 13, outline: "none", cursor: "pointer", minWidth: 160 }}
+                          style={{ padding: "6px 10px", borderRadius: 7, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: assignSel[p.id] ? CLR.text : CLR.muted, fontSize: 13, outline: "none", cursor: "pointer", minWidth: 160 }}
                         >
                           <option value="" disabled>Select client…</option>
                           {users.map((u) => (
@@ -563,8 +540,6 @@ function FleetTab() {
 // ─── Set Password Modal ───────────────────────────────────────────────────────
 function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: () => void; onSuccess: (userId: string) => void }) {
   const navigate = useNavigate();
-  const { dark } = useTheme();
-  const CLR = dark ? DARK_CLR : LIGHT_CLR;
   const [newPass,     setNewPass]     = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [loading,     setLoading]     = useState(false);
@@ -603,14 +578,14 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
 
   const inputStyle: CSSProperties = {
     width: "100%", padding: "10px 12px", borderRadius: 8,
-    border: `1px solid ${CLR.border}`, background: CLR.bg,
+    border: `1px solid ${CLR.border}`, background: "#f8fafc",
     color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
     fontFamily: "'Inter',sans-serif",
   };
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)" }}>
-      <div style={{ ...card({ padding: 36, maxWidth: 440, width: "90%", position: "relative", borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }, CLR) }}>
+      <div style={{ ...card({ padding: 36, maxWidth: 440, width: "90%", position: "relative", borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.15)" }) }}>
         <button onClick={onClose} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", color: CLR.muted, cursor: "pointer" }}>
           <X size={18} />
         </button>
@@ -635,7 +610,7 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
               <button type="submit" disabled={loading} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 8, background: CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 14, cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.65 : 1, transition: "all 0.2s" }}>
                 {loading ? <Spinner /> : <><Check size={14} /> Set Password</>}
               </button>
-              <button type="button" onClick={onClose} style={{ padding: "11px 18px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button type="button" onClick={onClose} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
             </div>
           </form>
         ) : (
@@ -643,7 +618,7 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
             <div style={{ display: "flex", alignItems: "center", gap: 8, color: CLR.green, fontWeight: 700, fontSize: 15 }}>
               <Check size={16} /> Password updated successfully
             </div>
-            <div style={{ background: CLR.bg, border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "14px 16px" }}>
+            <div style={{ background: "#f8fafc", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "14px 16px" }}>
               <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>New Password</div>
               <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 18, color: CLR.accent, wordBreak: "break-all" }}>{newPass}</div>
             </div>
@@ -651,7 +626,7 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
               <button onClick={copy} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px", borderRadius: 8, background: copied ? CLR.greenBg : CLR.accentDim, border: `1px solid ${copied ? CLR.greenBdr : "#bfdbfe"}`, color: copied ? CLR.green : CLR.accent, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
                 {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy Password</>}
               </button>
-              <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Close</button>
+              <button onClick={onClose} style={{ padding: "10px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Close</button>
             </div>
           </div>
         )}
@@ -663,12 +638,6 @@ function SetPasswordModal({ user, onClose, onSuccess }: { user: User; onClose: (
 // ─── Clients Tab ──────────────────────────────────────────────────────────────
 function ClientsTab() {
   const navigate = useNavigate();
-  const { dark } = useTheme();
-  const CLR = dark ? DARK_CLR : LIGHT_CLR;
-  const card = (extra?: CSSProperties): CSSProperties => ({
-    background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 12,
-    boxShadow: dark ? "0 1px 3px rgba(0,0,0,0.3)" : "0 1px 3px rgba(0,0,0,0.05)", ...extra,
-  });
   const [users,         setUsers]         = useState<User[]>([]);
   const [demo,          setDemo]          = useState(false);
   const [loading,       setLoading]       = useState(true);
@@ -769,7 +738,7 @@ function ClientsTab() {
           value={clientSearch}
           onChange={(e) => setClientSearch(e.target.value)}
           placeholder="Search by name or email…"
-          style={{ width: "100%", padding: "8px 12px 8px 32px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: CLR.surface, color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
+          style={{ width: "100%", padding: "8px 12px 8px 32px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#fff", color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
           onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
           onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }}
         />
@@ -785,7 +754,7 @@ function ClientsTab() {
           <Fragment key={u.id}>
           <div style={{
             ...card({ padding: "16px 20px", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" as const }),
-            background: u.reset_requested ? CLR.amberBg : CLR.surface,
+            background: u.reset_requested ? CLR.amberBg : "#ffffff",
             borderColor: u.reset_requested ? CLR.amberBdr : CLR.border,
           }}>
             <div style={{ width: 42, height: 42, borderRadius: "50%", background: CLR.accentDim, border: `1px solid #bfdbfe`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Plus Jakarta Sans',sans-serif", fontWeight: 700, color: CLR.accent, fontSize: 16, flexShrink: 0 }}>
@@ -795,7 +764,7 @@ function ClientsTab() {
             <div style={{ flex: 1, minWidth: 160 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <span style={{ fontWeight: 600, color: CLR.text, fontSize: 14 }}>{u.name ?? u.email}</span>
-                <span style={{ fontSize: 11, fontWeight: 600, color: u.role === "CLIENT" ? CLR.muted : CLR.accent, background: u.role === "CLIENT" ? CLR.bg : CLR.accentDim, padding: "1px 7px", borderRadius: 4, border: `1px solid ${u.role === "CLIENT" ? CLR.border : "#bfdbfe"}` }}>{u.role}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: u.role === "CLIENT" ? CLR.muted : CLR.accent, background: u.role === "CLIENT" ? "#f1f5f9" : CLR.accentDim, padding: "1px 7px", borderRadius: 4, border: `1px solid ${u.role === "CLIENT" ? CLR.border : "#bfdbfe"}` }}>{u.role}</span>
                 {u.reset_requested && (
                   <span style={{ fontSize: 11, fontWeight: 600, color: CLR.amber, background: CLR.amberBg, padding: "1px 7px", borderRadius: 4, border: `1px solid ${CLR.amberBdr}`, letterSpacing: "0.04em" }}>Reset Requested</span>
                 )}
@@ -806,18 +775,18 @@ function ClientsTab() {
 
             <button
               onClick={() => toggleUserProjects(u.id)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: expandedUser === u.id ? CLR.accentDim : CLR.bg, border: `1px solid ${expandedUser === u.id ? "#bfdbfe" : CLR.border}`, color: expandedUser === u.id ? CLR.accent : CLR.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: expandedUser === u.id ? CLR.accentDim : "#f8fafc", border: `1px solid ${expandedUser === u.id ? "#bfdbfe" : CLR.border}`, color: expandedUser === u.id ? CLR.accent : CLR.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
               onMouseEnter={(e) => { if (expandedUser !== u.id) { e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.color = CLR.accent; e.currentTarget.style.background = CLR.accentDim; } }}
-              onMouseLeave={(e) => { if (expandedUser !== u.id) { e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; e.currentTarget.style.background = CLR.bg; } }}
+              onMouseLeave={(e) => { if (expandedUser !== u.id) { e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; e.currentTarget.style.background = "#f8fafc"; } }}
             >
               <Globe size={12} /> Projects ({u.project_count ?? 0})
             </button>
 
             <button
               onClick={() => setSetPassUser(u)}
-              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: u.reset_requested ? CLR.amberBg : CLR.bg, border: `1px solid ${u.reset_requested ? CLR.amberBdr : CLR.border}`, color: u.reset_requested ? CLR.amber : CLR.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
+              style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: u.reset_requested ? CLR.amberBg : "#f8fafc", border: `1px solid ${u.reset_requested ? CLR.amberBdr : CLR.border}`, color: u.reset_requested ? CLR.amber : CLR.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
               onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.color = CLR.accent; e.currentTarget.style.background = CLR.accentDim; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = u.reset_requested ? CLR.amberBdr : CLR.border; e.currentTarget.style.color = u.reset_requested ? CLR.amber : CLR.muted; e.currentTarget.style.background = u.reset_requested ? CLR.amberBg : CLR.bg; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = u.reset_requested ? CLR.amberBdr : CLR.border; e.currentTarget.style.color = u.reset_requested ? CLR.amber : CLR.muted; e.currentTarget.style.background = u.reset_requested ? CLR.amberBg : "#f8fafc"; }}
             >
               <RefreshCw size={12} /> Set Password
             </button>
@@ -837,7 +806,7 @@ function ClientsTab() {
                     </button>
                     <button
                       onClick={() => { setConfirmDelete(null); setDeleteError(null); }}
-                      style={{ padding: "6px 12px", borderRadius: 7, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 12, cursor: "pointer" }}
+                      style={{ padding: "6px 12px", borderRadius: 7, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 12, cursor: "pointer" }}
                     >
                       Cancel
                     </button>
@@ -846,9 +815,9 @@ function ClientsTab() {
               ) : (
                 <button
                   onClick={() => { setConfirmDelete(u.id); setDeleteError(null); }}
-                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = CLR.dangerBdr; e.currentTarget.style.color = CLR.danger; e.currentTarget.style.background = CLR.dangerBg; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; e.currentTarget.style.background = CLR.bg; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; e.currentTarget.style.background = "#f8fafc"; }}
                 >
                   <X size={12} /> Delete
                 </button>
@@ -868,7 +837,7 @@ function ClientsTab() {
                 return (
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 10 }}>
                     {userProjects.map((p) => (
-                      <div key={p.id} style={{ background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+                      <div key={p.id} style={{ background: "#ffffff", border: `1px solid ${CLR.border}`, borderRadius: 10, padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
                         <div style={{ fontWeight: 600, color: CLR.text, fontSize: 13 }}>{p.name}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" as const }}>
                           <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[p.tier] ?? CLR.muted, background: `${TIER_COLOR[p.tier] ?? CLR.muted}14`, padding: "2px 7px", borderRadius: 4, border: `1px solid ${TIER_COLOR[p.tier] ?? CLR.muted}28` }}>TIER {p.tier}</span>
@@ -900,8 +869,6 @@ function ClientsTab() {
 // ─── Create User Tab ──────────────────────────────────────────────────────────
 function CreateUserTab() {
   const navigate = useNavigate();
-  const { dark } = useTheme();
-  const CLR = dark ? DARK_CLR : LIGHT_CLR;
   const [name,     setName]     = useState("");
   const [email,    setEmail]    = useState("");
   const [company,  setCompany]  = useState("");
@@ -938,7 +905,7 @@ function CreateUserTab() {
 
   const inputStyle: CSSProperties = {
     width: "100%", padding: "10px 12px", borderRadius: 8,
-    border: `1px solid ${CLR.border}`, background: CLR.bg,
+    border: `1px solid ${CLR.border}`, background: "#f8fafc",
     color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
     fontFamily: "'Inter',sans-serif", transition: "border-color 0.2s, box-shadow 0.2s",
   };
@@ -946,7 +913,7 @@ function CreateUserTab() {
   const toggleBtnStyle = (active: boolean): CSSProperties => ({
     padding: "7px 20px", borderRadius: 7, fontSize: 13,
     fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
-    background: active ? CLR.accentDim : CLR.bg,
+    background: active ? CLR.accentDim : "#f8fafc",
     border: `1px solid ${active ? "#bfdbfe" : CLR.border}`,
     color: active ? CLR.accent : CLR.muted,
   });
@@ -1010,12 +977,6 @@ function CreateUserTab() {
 // ─── Online Projects Tab ──────────────────────────────────────────────────────
 function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label: string }[] }) {
   const navigate = useNavigate();
-  const { dark } = useTheme();
-  const CLR = dark ? DARK_CLR : LIGHT_CLR;
-  const card = (extra?: CSSProperties): CSSProperties => ({
-    background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 12,
-    boxShadow: dark ? "0 1px 3px rgba(0,0,0,0.3)" : "0 1px 3px rgba(0,0,0,0.05)", ...extra,
-  });
 
   // list state
   const [projects,     setProjects]     = useState<OnlineProject[]>([]);
@@ -1335,7 +1296,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
 
   const inputStyle: CSSProperties = {
     width: "100%", padding: "10px 12px", borderRadius: 8,
-    border: `1px solid ${CLR.border}`, background: CLR.bg,
+    border: `1px solid ${CLR.border}`, background: "#f8fafc",
     color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
     fontFamily: "'Inter',sans-serif", transition: "border-color 0.2s, box-shadow 0.2s",
   };
@@ -1343,13 +1304,13 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
   const toggleBtn = (active: boolean, color?: string): CSSProperties => ({
     padding: "7px 18px", borderRadius: 7, fontSize: 13,
     fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
-    background: active ? (color ? `${color}14` : CLR.accentDim) : CLR.bg,
+    background: active ? (color ? `${color}14` : CLR.accentDim) : "#f8fafc",
     border: `1px solid ${active ? (color ? `${color}40` : "#bfdbfe") : CLR.border}`,
     color: active ? (color ?? CLR.accent) : CLR.muted,
   });
 
-  const thStyle: CSSProperties = { textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", borderBottom: `1px solid ${CLR.border}`, background: CLR.bg };
-  const tdStyle: CSSProperties = { padding: "12px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid ${CLR.border}` };
+  const thStyle: CSSProperties = { textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase", whiteSpace: "nowrap", borderBottom: `1px solid ${CLR.border}`, background: "#f8fafc" };
+  const tdStyle: CSSProperties = { padding: "12px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9` };
 
   const deleteProject_ = projects.find((p) => p.id === deleteId);
   const renewProject_  = projects.find((p) => p.id === renewId);
@@ -1372,7 +1333,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
               <button onClick={renewProject} disabled={renewing} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "11px", borderRadius: 8, background: CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 14, cursor: renewing ? "not-allowed" : "pointer", opacity: renewing ? 0.65 : 1 }}>
                 {renewing ? <Spinner /> : <><RefreshCw size={14} /> Renew</>}
               </button>
-              <button onClick={() => { setRenewId(null); setRenewError(null); }} style={{ padding: "11px 18px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => { setRenewId(null); setRenewError(null); }} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -1398,7 +1359,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
               >
                 {deleteLoading ? <Spinner /> : <><X size={14} /> Delete</>}
               </button>
-              <button onClick={() => { setDeleteId(null); setDeleteInput(""); setDeleteError(null); }} style={{ padding: "11px 18px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+              <button onClick={() => { setDeleteId(null); setDeleteInput(""); setDeleteError(null); }} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
             </div>
           </div>
         </div>
@@ -1428,7 +1389,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                       <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", marginBottom: checked ? 6 : 0 }}>
                         <div
                           onClick={() => setPushCfgRegisters((prev) => { const s = new Set(prev); s.has(reg) ? s.delete(reg) : s.add(reg); return s; })}
-                          style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${checked ? CLR.accent : CLR.border}`, background: checked ? CLR.accentDim : CLR.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}
+                          style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${checked ? CLR.accent : CLR.border}`, background: checked ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}
                         >
                           {checked && <Check size={10} color={CLR.accent} />}
                         </div>
@@ -1443,7 +1404,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                               value={pushCfgThresholds[reg]?.min ?? ""}
                               onChange={(e) => setPushCfgThresholds((prev) => ({ ...prev, [reg]: { ...prev[reg], min: e.target.value } }))}
                               placeholder="—"
-                              style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }}
+                              style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }}
                               onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
                               onBlur={(e) => { e.target.style.borderColor = CLR.border; }}
                             />
@@ -1455,7 +1416,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                               value={pushCfgThresholds[reg]?.max ?? ""}
                               onChange={(e) => setPushCfgThresholds((prev) => ({ ...prev, [reg]: { ...prev[reg], max: e.target.value } }))}
                               placeholder="—"
-                              style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }}
+                              style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }}
                               onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
                               onBlur={(e) => { e.target.style.borderColor = CLR.border; }}
                             />
@@ -1475,7 +1436,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                   min={500}
                   value={pushCfgPollRate}
                   onChange={(e) => setPushCfgPollRate(Number(e.target.value))}
-                  style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box" as const }}
                   onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
                   onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }}
                 />
@@ -1492,7 +1453,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                 >
                   {pushCfgSaving ? <Spinner /> : <><Send size={14} /> Deploy</>}
                 </button>
-                <button onClick={() => { setPushCfgProjectId(null); setPushCfgMachineId(null); }} style={{ padding: "11px 18px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                <button onClick={() => { setPushCfgProjectId(null); setPushCfgMachineId(null); }} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
               </div>
             </div>
           </div>
@@ -1512,7 +1473,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
               <Check size={16} /> Project Created — Save this key now!
             </div>
             <div style={{ fontSize: 12, color: CLR.muted, marginBottom: 12 }}>This key will not be shown again.</div>
-            <div style={{ background: CLR.surface, border: `1px solid ${CLR.greenBdr}`, borderRadius: 8, padding: "12px 14px", fontFamily: "'Share Tech Mono',monospace", fontSize: 13, color: CLR.accent, wordBreak: "break-all", lineHeight: 1.6, marginBottom: 12 }}>{newKey}</div>
+            <div style={{ background: "#fff", border: `1px solid ${CLR.greenBdr}`, borderRadius: 8, padding: "12px 14px", fontFamily: "'Share Tech Mono',monospace", fontSize: 13, color: CLR.accent, wordBreak: "break-all", lineHeight: 1.6, marginBottom: 12 }}>{newKey}</div>
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 onClick={() => { navigator.clipboard.writeText(newKey).then(() => { setCopiedKey(true); setTimeout(() => setCopiedKey(false), 2000); }); }}
@@ -1520,7 +1481,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
               >
                 {copiedKey ? <><Check size={13} /> Copied!</> : <><Copy size={13} /> Copy to Clipboard</>}
               </button>
-              <button onClick={() => setNewKey(null)} style={{ padding: "9px 16px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Dismiss</button>
+              <button onClick={() => setNewKey(null)} style={{ padding: "9px 16px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Dismiss</button>
             </div>
           </div>
         )}
@@ -1562,7 +1523,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {meterOptions.map((opt) => (
                 <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                  <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : CLR.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                  <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                     {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
                   </div>
                   <span style={{ fontSize: 13, color: meters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
@@ -1605,7 +1566,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
           <h3 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 16, color: CLR.text, letterSpacing: "-0.02em", margin: 0 }}>Projects</h3>
           <span style={{ fontSize: 11, fontWeight: 700, color: CLR.accent, background: CLR.accentDim, border: "1px solid #bfdbfe", padding: "1px 8px", borderRadius: 4 }}>{projects.length}</span>
           {hiddenProjects.size > 0 && (
-            <button type="button" onClick={() => setShowHiddenProjects((v) => !v)} style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 6, background: showHiddenProjects ? CLR.amberBg : CLR.bg, border: `1px solid ${showHiddenProjects ? CLR.amberBdr : CLR.border}`, color: showHiddenProjects ? CLR.amber : CLR.muted, cursor: "pointer" }}>
+            <button type="button" onClick={() => setShowHiddenProjects((v) => !v)} style={{ marginLeft: "auto", fontSize: 12, fontWeight: 600, padding: "4px 12px", borderRadius: 6, background: showHiddenProjects ? CLR.amberBg : "#f8fafc", border: `1px solid ${showHiddenProjects ? CLR.amberBdr : CLR.border}`, color: showHiddenProjects ? CLR.amber : CLR.muted, cursor: "pointer" }}>
               {showHiddenProjects ? "Hide hidden" : `Show hidden (${hiddenProjects.size})`}
             </button>
           )}
@@ -1647,7 +1608,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                     <span style={{ fontSize: 12, color: CLR.muted }}>{p.expires_at ?? "—"}</span>
                     {/* Actions */}
                     <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "flex-end" }}>
-                      <button onClick={() => toggleHideProject(p.id)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: hiddenProjects.has(p.id) ? CLR.accentDim : CLR.bg, border: `1px solid ${hiddenProjects.has(p.id) ? "#bfdbfe" : CLR.border}`, color: hiddenProjects.has(p.id) ? CLR.accent : CLR.muted, cursor: "pointer" }}>
+                      <button onClick={() => toggleHideProject(p.id)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: hiddenProjects.has(p.id) ? CLR.accentDim : "#f8fafc", border: `1px solid ${hiddenProjects.has(p.id) ? "#bfdbfe" : CLR.border}`, color: hiddenProjects.has(p.id) ? CLR.accent : CLR.muted, cursor: "pointer" }}>
                         {hiddenProjects.has(p.id) ? "Show" : "Hide"}
                       </button>
                       <button onClick={() => openEdit(p)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 10px", borderRadius: 6, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, cursor: "pointer" }}>Edit</button>
@@ -1665,7 +1626,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
 
                   {/* Inline edit form */}
                   {editId === p.id && (
-                    <div style={{ borderTop: `1px solid ${CLR.border}`, padding: "20px 20px", background: CLR.bg }}>
+                    <div style={{ borderTop: `1px solid ${CLR.border}`, padding: "20px 20px", background: "#f8fafc" }}>
                       <div style={{ fontWeight: 700, fontSize: 13, color: CLR.text, marginBottom: 14 }}>Edit Project</div>
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
                         <div style={{ gridColumn: "1 / -1" }}>
@@ -1700,7 +1661,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
                           {meterOptions.map((opt) => (
                             <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                              <div onClick={() => toggleEditMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${editMeters.includes(opt.id) ? CLR.accent : CLR.border}`, background: editMeters.includes(opt.id) ? CLR.accentDim : CLR.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                              <div onClick={() => toggleEditMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${editMeters.includes(opt.id) ? CLR.accent : CLR.border}`, background: editMeters.includes(opt.id) ? CLR.accentDim : "#fff", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                                 {editMeters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
                               </div>
                               <span style={{ fontSize: 13, color: editMeters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
@@ -1727,17 +1688,17 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                         <button onClick={() => saveEdit(p.id)} disabled={editing} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 18px", borderRadius: 8, background: CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 13, cursor: editing ? "not-allowed" : "pointer", opacity: editing ? 0.65 : 1 }}>
                           {editing ? <Spinner /> : <><Check size={13} /> Save Changes</>}
                         </button>
-                        <button onClick={() => setEditId(null)} style={{ padding: "9px 16px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                        <button onClick={() => setEditId(null)} style={{ padding: "9px 16px", borderRadius: 8, background: "#fff", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
                       </div>
                     </div>
                   )}
 
                   {/* Expanded detail */}
                   {expanded === p.id && (
-                    <div style={{ borderTop: `1px solid ${CLR.border}`, padding: "20px 20px", background: CLR.bg }}>
+                    <div style={{ borderTop: `1px solid ${CLR.border}`, padding: "20px 20px", background: "#fafcff" }}>
                       {/* Details panel */}
                       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px,1fr))", gap: 10, marginBottom: 20 }}>
-                        <div style={{ background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                        <div style={{ background: "#fff", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
                           <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Project Key</div>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 12, color: CLR.accent }}>
@@ -1751,16 +1712,16 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                           </div>
                         </div>
                         {p.notes && (
-                          <div style={{ background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                          <div style={{ background: "#fff", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
                             <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Notes</div>
                             <div style={{ fontSize: 13, color: CLR.text }}>{p.notes}</div>
                           </div>
                         )}
-                        <div style={{ background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                        <div style={{ background: "#fff", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
                           <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Meters</div>
                           <div style={{ fontSize: 12, color: CLR.text }}>{(p.allowed_meters ?? []).join(", ") || "—"}</div>
                         </div>
-                        <div style={{ background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
+                        <div style={{ background: "#fff", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "12px 14px" }}>
                           <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>Protocols</div>
                           <div style={{ fontSize: 13, color: CLR.text }}>{p.protocols ?? "—"}</div>
                         </div>
@@ -1791,7 +1752,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                               <thead>
                                 <tr>
                                   {["Node Name", "Machine ID", "Last Seen", "Polling", "Active", ""].map((h) => (
-                                    <th key={h} style={{ ...thStyle, background: CLR.bg }}>{h}</th>
+                                    <th key={h} style={{ ...thStyle, background: "#f8fafc" }}>{h}</th>
                                   ))}
                                 </tr>
                               </thead>
@@ -1805,7 +1766,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                                       <td style={{ ...tdStyle, color: CLR.muted }}>{a.last_seen || "—"}</td>
                                       <td style={tdStyle}>
                                         {a.polling_state ? (
-                                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, color: a.polling_state === "running" ? CLR.green : a.polling_state === "fault" ? CLR.amber : CLR.muted, background: a.polling_state === "running" ? CLR.greenBg : a.polling_state === "fault" ? CLR.amberBg : CLR.bg, border: `1px solid ${a.polling_state === "running" ? CLR.greenBdr : a.polling_state === "fault" ? CLR.amberBdr : CLR.border}` }}>
+                                          <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 20, color: a.polling_state === "running" ? CLR.green : a.polling_state === "fault" ? CLR.amber : CLR.muted, background: a.polling_state === "running" ? CLR.greenBg : a.polling_state === "fault" ? CLR.amberBg : "#f8fafc", border: `1px solid ${a.polling_state === "running" ? CLR.greenBdr : a.polling_state === "fault" ? CLR.amberBdr : CLR.border}` }}>
                                             <span style={{ width: 6, height: 6, borderRadius: "50%", flexShrink: 0, background: a.polling_state === "running" ? CLR.green : a.polling_state === "fault" ? CLR.amber : CLR.muted2 }} />
                                             {a.polling_state.toUpperCase()}
                                           </span>
@@ -1815,7 +1776,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                                         <button
                                           onClick={() => toggleNode(p.id, a.machine_id, a.is_active)}
                                           disabled={!!nodeToggleLoading[nKey]}
-                                          style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 5, background: a.is_active ? CLR.greenBg : CLR.bg, border: `1px solid ${a.is_active ? CLR.greenBdr : CLR.border}`, color: a.is_active ? CLR.green : CLR.muted, cursor: nodeToggleLoading[nKey] ? "not-allowed" : "pointer", opacity: nodeToggleLoading[nKey] ? 0.65 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}
+                                          style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 5, background: a.is_active ? CLR.greenBg : "#f8fafc", border: `1px solid ${a.is_active ? CLR.greenBdr : CLR.border}`, color: a.is_active ? CLR.green : CLR.muted, cursor: nodeToggleLoading[nKey] ? "not-allowed" : "pointer", opacity: nodeToggleLoading[nKey] ? 0.65 : 1, display: "inline-flex", alignItems: "center", gap: 5 }}
                                         >
                                           {nodeToggleLoading[nKey] ? <Spinner /> : (a.is_active ? "Active" : "Inactive")}
                                         </button>
@@ -1823,7 +1784,7 @@ function OnlineProjectsTab({ meterOptions }: { meterOptions: { id: string; label
                                       <td style={tdStyle}>
                                         <button
                                           onClick={() => openPushConfig(p.id, a.machine_id, p.allowed_meters ?? [])}
-                                          style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 5, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}
+                                          style={{ fontSize: 12, fontWeight: 600, padding: "4px 10px", borderRadius: 5, background: "#eff6ff", border: "1px solid #bfdbfe", color: CLR.accent, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}
                                         >
                                           <Send size={11} /> Push Config
                                         </button>
@@ -1853,12 +1814,6 @@ type LicenseProtocol = "RTU Only" | "TCP Only" | "All Protocols";
 
 function LicenseTab({ meterOptions }: { meterOptions: { id: string; label: string }[] }) {
   const navigate = useNavigate();
-  const { dark } = useTheme();
-  const CLR = dark ? DARK_CLR : LIGHT_CLR;
-  const card = (extra?: CSSProperties): CSSProperties => ({
-    background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 12,
-    boxShadow: dark ? "0 1px 3px rgba(0,0,0,0.3)" : "0 1px 3px rgba(0,0,0,0.05)", ...extra,
-  });
   const [username,    setUsername]    = useState("");
   const [projectName, setProjectName] = useState("");
   const [protocols,   setProtocols]   = useState<LicenseProtocol>("All Protocols");
@@ -1943,7 +1898,7 @@ function LicenseTab({ meterOptions }: { meterOptions: { id: string; label: strin
 
   const inputStyle: CSSProperties = {
     width: "100%", padding: "10px 12px", borderRadius: 8,
-    border: `1px solid ${CLR.border}`, background: CLR.bg,
+    border: `1px solid ${CLR.border}`, background: "#f8fafc",
     color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box",
     fontFamily: "'Inter',sans-serif", transition: "border-color 0.2s, box-shadow 0.2s",
   };
@@ -1951,7 +1906,7 @@ function LicenseTab({ meterOptions }: { meterOptions: { id: string; label: strin
   const toggleBtn = (active: boolean, color?: string): CSSProperties => ({
     padding: "7px 18px", borderRadius: 7, fontSize: 13,
     fontWeight: 600, cursor: "pointer", transition: "all 0.15s",
-    background: active ? (color ? `${color}14` : CLR.accentDim) : CLR.bg,
+    background: active ? (color ? `${color}14` : CLR.accentDim) : "#f8fafc",
     border: `1px solid ${active ? (color ? `${color}40` : "#bfdbfe") : CLR.border}`,
     color: active ? (color ?? CLR.accent) : CLR.muted,
   });
@@ -1997,7 +1952,7 @@ function LicenseTab({ meterOptions }: { meterOptions: { id: string; label: strin
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {meterOptions.map((opt) => (
                 <label key={opt.id} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                  <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : CLR.bg, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
+                  <div onClick={() => toggleMeter(opt.id)} style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${meters.includes(opt.id) ? CLR.accent : CLR.border}`, background: meters.includes(opt.id) ? CLR.accentDim : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
                     {meters.includes(opt.id) && <Check size={10} color={CLR.accent} />}
                   </div>
                   <span style={{ fontSize: 13, color: meters.includes(opt.id) ? CLR.text : CLR.muted }}>{opt.label}</span>
@@ -2035,13 +1990,13 @@ function LicenseTab({ meterOptions }: { meterOptions: { id: string; label: strin
                   ["Protocols", result.protocols],
                   ["Expires",   result.expires_at],
                 ] as ([string, string] | null)[]).filter((x): x is [string, string] => x !== null).map(([k, v]) => (
-                  <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderBottom: `1px solid ${CLR.border}` }}>
+                  <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, padding: "6px 0", borderBottom: `1px solid #f1f5f9` }}>
                     <span style={{ color: CLR.muted }}>{k}</span>
                     <span style={{ color: CLR.text, fontWeight: 600 }}>{v}</span>
                   </div>
                 ))}
               </div>
-              <div style={{ background: CLR.bg, border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "14px 16px" }}>
+              <div style={{ background: "#f8fafc", border: `1px solid ${CLR.border}`, borderRadius: 8, padding: "14px 16px" }}>
                 <div style={{ fontSize: 10, fontWeight: 600, color: CLR.muted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>License Key</div>
                 <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 13, color: CLR.accent, wordBreak: "break-all", lineHeight: 1.6 }}>{result.license_key}</div>
               </div>
@@ -2050,7 +2005,7 @@ function LicenseTab({ meterOptions }: { meterOptions: { id: string; label: strin
                 {copied ? <><Check size={14} /> Copied!</> : <><Copy size={14} /> Copy Key</>}
               </button>
               <button onClick={() => setResult(null)}
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px", borderRadius: 8, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>
                 Generate Another
               </button>
             </div>
@@ -2072,7 +2027,7 @@ function LicenseTab({ meterOptions }: { meterOptions: { id: string; label: strin
           </div>
           {hiddenLicenses.size > 0 && (
             <button type="button" onClick={() => setShowHidden((v) => !v)}
-              style={{ padding: "6px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", background: showHidden ? CLR.accentDim : CLR.bg, border: `1px solid ${showHidden ? "#bfdbfe" : CLR.border}`, color: showHidden ? CLR.accent : CLR.muted, transition: "all 0.15s" }}>
+              style={{ padding: "6px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", background: showHidden ? CLR.accentDim : "#f8fafc", border: `1px solid ${showHidden ? "#bfdbfe" : CLR.border}`, color: showHidden ? CLR.accent : CLR.muted, transition: "all 0.15s" }}>
               {showHidden ? "Hide hidden" : `Show hidden (${hiddenLicenses.size})`}
             </button>
           )}
@@ -2090,27 +2045,27 @@ function LicenseTab({ meterOptions }: { meterOptions: { id: string; label: strin
                 <thead>
                   <tr>
                     {["Username", "Project", "Mode", "Tier", "Protocols", "Expires", "Created", ""].map((h) => (
-                      <th key={h} style={{ textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase" as const, whiteSpace: "nowrap" as const, borderBottom: `1px solid ${CLR.border}`, background: CLR.bg }}>{h}</th>
+                      <th key={h} style={{ textAlign: "left", padding: "10px 14px", color: CLR.muted, fontWeight: 600, fontSize: 11, letterSpacing: "0.08em", textTransform: "uppercase" as const, whiteSpace: "nowrap" as const, borderBottom: `1px solid ${CLR.border}`, background: "#f8fafc" }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {licenseHistory.filter((r) => showHidden || !hiddenLicenses.has(String(r.id))).map((r) => (
                     <tr key={r.id} style={{ opacity: hiddenLicenses.has(String(r.id)) ? 0.4 : 1 }}>
-                      <td style={{ padding: "11px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid ${CLR.border}`, fontWeight: 500 }}>{r.username}</td>
-                      <td style={{ padding: "11px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid ${CLR.border}` }}>{r.project_name}</td>
-                      <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid ${CLR.border}` }}>{r.mode}</td>
-                      <td style={{ padding: "11px 14px", fontSize: 13, borderBottom: `1px solid ${CLR.border}` }}>
+                      <td style={{ padding: "11px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9`, fontWeight: 500 }}>{r.username}</td>
+                      <td style={{ padding: "11px 14px", color: CLR.text, fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>{r.project_name}</td>
+                      <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>{r.mode}</td>
+                      <td style={{ padding: "11px 14px", fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>
                         {r.tier != null ? (
                           <span style={{ fontSize: 11, fontWeight: 700, color: TIER_COLOR[r.tier] ?? CLR.muted, background: `${TIER_COLOR[r.tier] ?? CLR.muted}14`, padding: "2px 8px", borderRadius: 5, border: `1px solid ${TIER_COLOR[r.tier] ?? CLR.muted}28` }}>TIER {r.tier}</span>
                         ) : <span style={{ color: CLR.muted2 }}>—</span>}
                       </td>
-                      <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid ${CLR.border}` }}>{r.protocols}</td>
-                      <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid ${CLR.border}`, whiteSpace: "nowrap" as const }}>{r.expires_at}</td>
-                      <td style={{ padding: "11px 14px", color: CLR.muted2, fontSize: 12, borderBottom: `1px solid ${CLR.border}`, whiteSpace: "nowrap" as const }}>{r.created_at}</td>
-                      <td style={{ padding: "11px 14px", borderBottom: `1px solid ${CLR.border}` }}>
+                      <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9` }}>{r.protocols}</td>
+                      <td style={{ padding: "11px 14px", color: CLR.muted, fontSize: 13, borderBottom: `1px solid #f1f5f9`, whiteSpace: "nowrap" as const }}>{r.expires_at}</td>
+                      <td style={{ padding: "11px 14px", color: CLR.muted2, fontSize: 12, borderBottom: `1px solid #f1f5f9`, whiteSpace: "nowrap" as const }}>{r.created_at}</td>
+                      <td style={{ padding: "11px 14px", borderBottom: `1px solid #f1f5f9` }}>
                         <button type="button" onClick={() => setHiddenLicenses((prev) => { const next = new Set(prev); if (next.has(String(r.id))) next.delete(String(r.id)); else next.add(String(r.id)); localStorage.setItem("hidden_offline_licenses", JSON.stringify([...next])); return next; })}
-                          style={{ padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: "pointer", background: hiddenLicenses.has(String(r.id)) ? CLR.accentDim : CLR.bg, border: `1px solid ${hiddenLicenses.has(String(r.id)) ? "#bfdbfe" : CLR.border}`, color: hiddenLicenses.has(String(r.id)) ? CLR.accent : CLR.muted, whiteSpace: "nowrap" }}>
+                          style={{ padding: "3px 10px", borderRadius: 5, fontSize: 11, fontWeight: 600, cursor: "pointer", background: hiddenLicenses.has(String(r.id)) ? CLR.accentDim : "#f8fafc", border: `1px solid ${hiddenLicenses.has(String(r.id)) ? "#bfdbfe" : CLR.border}`, color: hiddenLicenses.has(String(r.id)) ? CLR.accent : CLR.muted, whiteSpace: "nowrap" }}>
                           {hiddenLicenses.has(String(r.id)) ? "Show" : "Hide"}
                         </button>
                       </td>
@@ -2131,12 +2086,6 @@ const BLANK_REGISTER = (): MeterRegister => ({ name: "", address: 0, length: 1, 
 
 function MeterProfilesTab() {
   const navigate = useNavigate();
-  const { dark } = useTheme();
-  const CLR = dark ? DARK_CLR : LIGHT_CLR;
-  const card = (extra?: CSSProperties): CSSProperties => ({
-    background: CLR.surface, border: `1px solid ${CLR.border}`, borderRadius: 12,
-    boxShadow: dark ? "0 1px 3px rgba(0,0,0,0.3)" : "0 1px 3px rgba(0,0,0,0.05)", ...extra,
-  });
 
   const [profiles,     setProfiles]     = useState<MeterProfile[]>([]);
   const [loading,      setLoading]      = useState(true);
@@ -2368,28 +2317,28 @@ function MeterProfilesTab() {
           <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 80px 60px 110px 70px auto", gap: 6, marginBottom: 8, alignItems: "end" }}>
             <div>
               {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Name</div>}
-              <input value={reg.name} onChange={(e) => updateReg(i, "name", e.target.value)} placeholder="e.g. voltage_l1" style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }} />
+              <input value={reg.name} onChange={(e) => updateReg(i, "name", e.target.value)} placeholder="e.g. voltage_l1" style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }} />
             </div>
             <div>
               {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Address</div>}
-              <input type="number" value={reg.address} onChange={(e) => updateReg(i, "address", Number(e.target.value))} style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }} />
+              <input type="number" value={reg.address} onChange={(e) => updateReg(i, "address", Number(e.target.value))} style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }} />
             </div>
             <div>
               {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Len</div>}
-              <select value={reg.length} onChange={(e) => updateReg(i, "length", Number(e.target.value) as 1 | 2)} style={{ width: "100%", padding: "7px 8px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 12, outline: "none" }}>
+              <select value={reg.length} onChange={(e) => updateReg(i, "length", Number(e.target.value) as 1 | 2)} style={{ width: "100%", padding: "7px 8px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none" }}>
                 <option value={1}>1</option>
                 <option value={2}>2</option>
               </select>
             </div>
             <div>
               {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Data Type</div>}
-              <select value={reg.data_type} onChange={(e) => updateReg(i, "data_type", e.target.value as MeterRegister["data_type"])} style={{ width: "100%", padding: "7px 8px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 12, outline: "none" }}>
+              <select value={reg.data_type} onChange={(e) => updateReg(i, "data_type", e.target.value as MeterRegister["data_type"])} style={{ width: "100%", padding: "7px 8px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none" }}>
                 {(["Float32", "UInt16", "UInt32", "INT16", "INT32"] as const).map((dt) => <option key={dt} value={dt}>{dt}</option>)}
               </select>
             </div>
             <div>
               {i === 0 && <div style={{ fontSize: 10, color: CLR.muted, marginBottom: 3, fontWeight: 600 }}>Mult</div>}
-              <input type="number" step="any" value={reg.multiplier} onChange={(e) => updateReg(i, "multiplier", Number(e.target.value))} style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }} />
+              <input type="number" step="any" value={reg.multiplier} onChange={(e) => updateReg(i, "multiplier", Number(e.target.value))} style={{ width: "100%", padding: "7px 10px", borderRadius: 6, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, outline: "none", boxSizing: "border-box" as const }} />
             </div>
             <div style={{ paddingTop: i === 0 ? 16 : 0 }}>
               <button type="button" onClick={() => onChange(regs.filter((_, idx) => idx !== i))} style={{ padding: "6px 8px", borderRadius: 6, background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, color: CLR.danger, cursor: "pointer", display: "flex", alignItems: "center" }}>
@@ -2405,8 +2354,8 @@ function MeterProfilesTab() {
     );
   }
 
-  const inputStyle: CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "'Inter',sans-serif" };
-  const selectStyle: CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 13, outline: "none" };
+  const inputStyle: CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 13, outline: "none", boxSizing: "border-box", fontFamily: "'Inter',sans-serif" };
+  const selectStyle: CSSProperties = { width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 13, outline: "none" };
 
   return (
     <div className="admin-fade">
@@ -2442,9 +2391,9 @@ function MeterProfilesTab() {
                   <div style={{ fontSize: 12, color: CLR.muted, fontFamily: "'Share Tech Mono',monospace", marginTop: 2 }}>{p.model}</div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexShrink: 0, alignItems: "center", flexWrap: "wrap" as const }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, background: CLR.bg, border: `1px solid ${CLR.border}`, padding: "2px 8px", borderRadius: 5 }}>{p.endianness}</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, background: CLR.bg, border: `1px solid ${CLR.border}`, padding: "2px 8px", borderRadius: 5 }}>{p.baud_rate} baud</span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, background: CLR.bg, border: `1px solid ${CLR.border}`, padding: "2px 8px", borderRadius: 5 }}>{p.parity}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, background: "#f8fafc", border: `1px solid ${CLR.border}`, padding: "2px 8px", borderRadius: 5 }}>{p.endianness}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, background: "#f8fafc", border: `1px solid ${CLR.border}`, padding: "2px 8px", borderRadius: 5 }}>{p.baud_rate} baud</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: CLR.muted, background: "#f8fafc", border: `1px solid ${CLR.border}`, padding: "2px 8px", borderRadius: 5 }}>{p.parity}</span>
                   <span style={{ fontSize: 11, fontWeight: 600, color: CLR.accent, background: CLR.accentDim, border: "1px solid #bfdbfe", padding: "2px 8px", borderRadius: 5 }}>{p.registers.length} reg{p.registers.length !== 1 ? "s" : ""}</span>
                   {p.updated_at && <span style={{ fontSize: 11, color: CLR.muted2 }}>Updated {p.updated_at}</span>}
                   <button onClick={() => openEdit(p)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 6, background: CLR.accentDim, border: "1px solid #bfdbfe", color: CLR.accent, cursor: "pointer" }}>Edit</button>
@@ -2455,7 +2404,7 @@ function MeterProfilesTab() {
                       <button onClick={deleteProfile} disabled={deleteLoading} style={{ fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 5, background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, color: CLR.danger, cursor: deleteLoading ? "not-allowed" : "pointer" }}>
                         {deleteLoading ? <Spinner /> : "Delete"}
                       </button>
-                      <button onClick={() => { setDeleteId(null); setDeleteError(null); }} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, cursor: "pointer" }}>Cancel</button>
+                      <button onClick={() => { setDeleteId(null); setDeleteError(null); }} style={{ fontSize: 12, padding: "4px 10px", borderRadius: 5, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, cursor: "pointer" }}>Cancel</button>
                     </div>
                   ) : (
                     <button onClick={() => setDeleteId(p.id)} style={{ fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 6, background: CLR.dangerBg, border: `1px solid ${CLR.dangerBdr}`, color: CLR.danger, cursor: "pointer" }}>Delete</button>
@@ -2464,7 +2413,7 @@ function MeterProfilesTab() {
               </div>
               {/* Inline edit */}
               {editId === p.id && (
-                <div style={{ borderTop: `1px solid ${CLR.border}`, padding: "20px 18px", background: CLR.bg }}>
+                <div style={{ borderTop: `1px solid ${CLR.border}`, padding: "20px 18px", background: "#fafcff" }}>
                   <div style={{ fontWeight: 700, fontSize: 13, color: CLR.text, marginBottom: 14 }}>Edit Profile</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 14 }}>
                     <div>
@@ -2500,7 +2449,7 @@ function MeterProfilesTab() {
                     <button onClick={saveEdit} disabled={editSaving} style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 18px", borderRadius: 8, background: CLR.accent, border: "none", color: "#fff", fontWeight: 600, fontSize: 13, cursor: editSaving ? "not-allowed" : "pointer", opacity: editSaving ? 0.65 : 1 }}>
                       {editSaving ? <Spinner /> : <><Check size={13} /> Save Changes</>}
                     </button>
-                    <button onClick={() => setEditId(null)} style={{ padding: "9px 16px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                    <button onClick={() => setEditId(null)} style={{ padding: "9px 16px", borderRadius: 8, background: "#fff", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>Cancel</button>
                   </div>
                 </div>
               )}
@@ -2535,7 +2484,7 @@ function MeterProfilesTab() {
             </label>
             {importMode !== "none" && (
               <button type="button" onClick={() => { setImportMode("none"); setImportJson(""); setImportParsed(null); setImportError(null); setImportSuccess(null); }}
-                style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "7px 10px", borderRadius: 7, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 12, cursor: "pointer" }}>
+                style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "7px 10px", borderRadius: 7, background: "#f8fafc", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 12, cursor: "pointer" }}>
                 <X size={12} /> Clear
               </button>
             )}
@@ -2547,7 +2496,7 @@ function MeterProfilesTab() {
             value={importJson}
             onChange={(e) => validateAndSetImport(e.target.value)}
             placeholder={`{\n  "model": "schneider_pm2220",\n  "display_name": "Schneider PM2220",\n  "endianness": "ABCD",\n  "baud_rate": 9600,\n  "parity": "None",\n  "registers": [\n    { "name": "voltage_l1", "address": 3000, "length": 2, "data_type": "Float32", "multiplier": 1 }\n  ]\n}`}
-            style={{ width: "100%", minHeight: 180, padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: CLR.bg, color: CLR.text, fontSize: 12, fontFamily: "'Share Tech Mono',monospace", outline: "none", resize: "vertical", boxSizing: "border-box" }}
+            style={{ width: "100%", minHeight: 180, padding: "10px 12px", borderRadius: 8, border: `1px solid ${CLR.border}`, background: "#f8fafc", color: CLR.text, fontSize: 12, fontFamily: "'Share Tech Mono',monospace", outline: "none", resize: "vertical", boxSizing: "border-box" }}
             onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; e.target.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)"; }}
             onBlur={(e) => { e.target.style.borderColor = CLR.border; e.target.style.boxShadow = "none"; }}
           />
@@ -2583,7 +2532,7 @@ function MeterProfilesTab() {
               {importSaving ? <Spinner /> : <><Check size={13} /> Confirm &amp; Save</>}
             </button>
             <button type="button" onClick={() => { setImportParsed(null); setImportJson(""); setImportMode("none"); setImportError(null); }}
-              style={{ padding: "10px 16px", borderRadius: 8, background: CLR.bg, border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>
+              style={{ padding: "10px 16px", borderRadius: 8, background: "#fff", border: `1px solid ${CLR.border}`, color: CLR.muted, fontSize: 13, cursor: "pointer" }}>
               Cancel
             </button>
           </div>
@@ -2645,24 +2594,9 @@ const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
-  const { dark, toggle } = useTheme();
-  const CLR = dark ? DARK_CLR : LIGHT_CLR;
   const [tab, setTab] = useState<Tab>("fleet");
   const role = getRole();
   const [allMeterProfiles, setAllMeterProfiles] = useState<MeterProfile[]>([]);
-
-  const dotGrid = `
-    *,*::before,*::after { box-sizing: border-box; }
-    body { margin: 0; }
-    .admin-bg {
-      background-color: ${CLR.bg};
-      background-image: radial-gradient(circle, rgba(37,99,235,0.06) 1px, transparent 1px);
-      background-size: 28px 28px;
-    }
-    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
-    .admin-fade { animation: fadeIn 0.3s ease both; }
-    @keyframes spin-admin { to { transform:rotate(360deg); } }
-  `;
 
   useEffect(() => {
     const token = getToken();
@@ -2684,13 +2618,13 @@ export default function AdminDashboard() {
 
   return (
     <>
-      <style>{dotGrid}</style>
+      <style>{DOT_GRID}</style>
       <div className="admin-bg" style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter',system-ui,sans-serif" }}>
 
         {/* Sidebar */}
-        <aside style={{ width: 232, flexShrink: 0, background: CLR.sidebar, borderRight: `1px solid ${CLR.border}`, display: "flex", flexDirection: "column", boxShadow: dark ? "2px 0 8px rgba(0,0,0,0.3)" : "2px 0 8px rgba(0,0,0,0.04)" }}>
+        <aside style={{ width: 232, flexShrink: 0, background: CLR.sidebar, borderRight: `1px solid ${CLR.border}`, display: "flex", flexDirection: "column", boxShadow: "2px 0 8px rgba(0,0,0,0.04)" }}>
           {/* Logo */}
-          <div style={{ padding: "20px 18px 16px", borderBottom: `1px solid ${CLR.border}` }}>
+          <div style={{ padding: "20px 18px 16px", borderBottom: `1px solid #f1f5f9` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ width: 34, height: 34, borderRadius: 9, background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}>
                 <Zap size={16} color="#fff" strokeWidth={2.5} />
@@ -2723,7 +2657,7 @@ export default function AdminDashboard() {
                   color: active ? CLR.accent : CLR.muted,
                   transition: "all 0.15s",
                 }}
-                  onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = CLR.bg; e.currentTarget.style.color = CLR.text; } }}
+                  onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = "#f8fafc"; e.currentTarget.style.color = "#334155"; } }}
                   onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = CLR.muted; } }}
                 >
                   {item.icon} {item.label}
@@ -2733,32 +2667,18 @@ export default function AdminDashboard() {
           </nav>
 
           {/* Bottom buttons */}
-          <div style={{ padding: "12px 10px", borderTop: `1px solid ${CLR.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
-            {/* Theme Toggle */}
-            <button onClick={toggle} style={{
-              display: "flex", alignItems: "center", gap: 8, width: "100%",
-              padding: "9px 12px", borderRadius: 8,
-              background: CLR.bg, border: `1px solid ${CLR.border}`,
-              color: CLR.muted, cursor: "pointer",
-              fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: "0.85rem",
-              transition: "all 0.15s",
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = CLR.accentDim; e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.color = CLR.accent; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = CLR.bg; e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; }}
-            >
-              {dark ? <Sun size={14} /> : <Moon size={14} />} {dark ? "Light Mode" : "Dark Mode"}
-            </button>
+          <div style={{ padding: "12px 10px", borderTop: `1px solid #f1f5f9`, display: "flex", flexDirection: "column", gap: 6 }}>
             {/* Main Website */}
             <button onClick={() => navigate("/")} style={{
               display: "flex", alignItems: "center", gap: 8, width: "100%",
               padding: "9px 12px", borderRadius: 8,
-              background: CLR.bg, border: `1px solid ${CLR.border}`,
+              background: "#f8fafc", border: `1px solid ${CLR.border}`,
               color: CLR.muted, cursor: "pointer",
               fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: "0.85rem",
               transition: "all 0.15s",
             }}
               onMouseEnter={(e) => { e.currentTarget.style.background = CLR.accentDim; e.currentTarget.style.borderColor = "#bfdbfe"; e.currentTarget.style.color = CLR.accent; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = CLR.bg; e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "#f8fafc"; e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.muted; }}
             >
               <Globe size={14} /> Main Website
             </button>
