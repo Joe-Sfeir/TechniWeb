@@ -18,48 +18,110 @@ const POLL_MS       = 2000;
 // Keys in a telemetry row that are NOT variables
 const NON_VAR = new Set(["timestamp", "device_name", "id", "project_id", "created_at", "updated_at"]);
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
+// ─── Design tokens (matched to Dashboard theme) ───────────────────────────────
 
+const T = {
+  light: {
+    bg:        "#f8fafc",
+    surface:   "#ffffff",
+    surfaceAlt:"#f1f5f9",
+    border:    "#e2e8f0",
+    borderDim: "#f1f5f9",
+    accent:    "#1a5fff",
+    accentDim: "rgba(26,95,255,0.08)",
+    text:      "#0f172a",
+    muted:     "#64748b",
+    muted2:    "#94a3b8",
+    header:    "rgba(255,255,255,0.92)",
+    tabBar:    "rgba(248,250,252,0.95)",
+    cardShadow:"0 2px 8px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.04)",
+    green:     "#10b981",
+    greenBg:   "rgba(16,185,129,0.08)",
+    greenBdr:  "rgba(16,185,129,0.2)",
+    amber:     "#f59e0b",
+    amberBg:   "rgba(245,158,11,0.08)",
+    amberBdr:  "rgba(245,158,11,0.2)",
+    red:       "#ef4444",
+    redBg:     "rgba(239,68,68,0.08)",
+    redBdr:    "rgba(239,68,68,0.2)",
+    purple:    "#8b5cf6",
+    teal:      "#14b8a6",
+    orange:    "#f97316",
+    indigo:    "#6366f1",
+  },
+  dark: {
+    bg:        "#050505",
+    surface:   "#111111",
+    surfaceAlt:"#0a0a0a",
+    border:    "#222222",
+    borderDim: "rgba(255,255,255,0.04)",
+    accent:    "#1a5fff",
+    accentDim: "rgba(26,95,255,0.12)",
+    text:      "#ffffff",
+    muted:     "#a1a1aa",
+    muted2:    "#52525b",
+    header:    "rgba(5,5,5,0.92)",
+    tabBar:    "rgba(10,10,10,0.95)",
+    cardShadow:"0 4px 20px rgba(0,0,0,0.4)",
+    green:     "#10b981",
+    greenBg:   "rgba(16,185,129,0.1)",
+    greenBdr:  "rgba(16,185,129,0.2)",
+    amber:     "#f59e0b",
+    amberBg:   "rgba(245,158,11,0.1)",
+    amberBdr:  "rgba(245,158,11,0.2)",
+    red:       "#ef4444",
+    redBg:     "rgba(239,68,68,0.1)",
+    redBdr:    "rgba(239,68,68,0.2)",
+    purple:    "#8b5cf6",
+    teal:      "#14b8a6",
+    orange:    "#f97316",
+    indigo:    "#6366f1",
+  },
+};
+
+// Keep the old CLR for backward compat with palette helpers
 const CLR = {
-  bgPage:    (d: boolean) => d ? "#0f1117" : "#f1f5f9",
-  bgHeader:  (d: boolean) => d ? "rgba(15,17,23,0.92)"    : "rgba(15,23,42,0.96)",
-  bgTabBar:  (d: boolean) => d ? "rgba(15,17,23,0.85)"    : "rgba(255,255,255,0.75)",
-  border:    (d: boolean) => d ? "rgba(255,255,255,0.08)"  : "rgba(15,23,42,0.10)",
-  borderDim: (d: boolean) => d ? "rgba(255,255,255,0.04)"  : "rgba(15,23,42,0.06)",
-  text1:     (d: boolean) => d ? "#f1f5f9"  : "#0f172a",
-  text2:     (d: boolean) => d ? "#94a3b8"  : "#475569",
-  text3:     (d: boolean) => d ? "#3d4a5e"  : "#94a3b8",
-  blue:   "#3b82f6",
-  green:  "#22c55e",
+  bgPage:    (d: boolean) => d ? T.dark.bg : T.light.bg,
+  bgHeader:  (d: boolean) => d ? T.dark.header : T.light.header,
+  bgTabBar:  (d: boolean) => d ? T.dark.tabBar : T.light.tabBar,
+  border:    (d: boolean) => d ? T.dark.border : T.light.border,
+  borderDim: (d: boolean) => d ? T.dark.borderDim : T.light.borderDim,
+  text1:     (d: boolean) => d ? T.dark.text : T.light.text,
+  text2:     (d: boolean) => d ? T.dark.muted : T.light.muted,
+  text3:     (d: boolean) => d ? T.dark.muted2 : T.light.muted2,
+  blue:   "#1a5fff",
+  green:  "#10b981",
   amber:  "#f59e0b",
   red:    "#ef4444",
-  purple: "#a855f7",
+  purple: "#8b5cf6",
   teal:   "#14b8a6",
   orange: "#f97316",
   indigo: "#6366f1",
 };
 
 const glass = (isDark: boolean): React.CSSProperties => ({
-  background: isDark ? "rgba(255,255,255,0.035)" : "rgba(255,255,255,0.82)",
-  border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(15,23,42,0.09)"}`,
+  background: isDark ? T.dark.surface : T.light.surface,
+  border: `1px solid ${isDark ? T.dark.border : T.light.border}`,
   borderRadius: "12px",
-  backdropFilter: "blur(12px)",
-  WebkitBackdropFilter: "blur(12px)",
-  boxShadow: isDark
-    ? "0 1px 3px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)"
-    : "0 2px 12px rgba(15,23,42,0.07), 0 1px 3px rgba(15,23,42,0.05), inset 0 1px 0 rgba(255,255,255,0.9)",
+  boxShadow: isDark ? T.dark.cardShadow : T.light.cardShadow,
 });
 
 const SCADA_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
   .scada-page {
     background-color: var(--pg);
-    background-image: radial-gradient(circle, var(--dot) 1px, transparent 1px);
-    background-size: 22px 22px;
+    min-height: 100svh;
+    font-family: 'Inter','Plus Jakarta Sans',sans-serif;
   }
-  [data-theme="dark"]  { --pg: #0f1117; --dot: rgba(255,255,255,0.055); }
-  [data-theme="light"] { --pg: #f1f5f9; --dot: rgba(15,23,42,0.07); }
-  @keyframes pulse-dot   { 0%,100%{opacity:1} 50%{opacity:0.35} }
-  @keyframes pulse-alarm { 0%,100%{box-shadow:0 0 0 1.5px #ef4444,0 0 8px #ef444433} 50%{box-shadow:0 0 0 1.5px #ef4444,0 0 18px #ef444466} }
+  [data-theme="dark"]  { --pg: #050505; }
+  [data-theme="light"] { --pg: #f8fafc; }
+  @keyframes spin-pv   { to { transform: rotate(360deg); } }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  @keyframes pulse-alarm { 0%,100%{box-shadow:0 0 0 2px #ef444433,0 0 12px #ef444422} 50%{box-shadow:0 0 0 2px #ef444466,0 0 20px #ef444444} }
+  @keyframes fadeSlideIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  .pv-fade { animation: fadeSlideIn 0.35s ease forwards; }
+  .pv-card-hover { transition: box-shadow 0.2s, border-color 0.2s; }
+  .pv-card-hover:hover { border-color: #1a5fff44 !important; box-shadow: 0 4px 24px rgba(26,95,255,0.08) !important; }
 `;
 
 const TAB_ACCENTS = [CLR.blue, CLR.green, CLR.amber, CLR.purple, CLR.red, CLR.teal, CLR.orange, CLR.indigo];
@@ -161,41 +223,55 @@ const DEMO_ROWS: TelemetryRow[] = Array.from({ length: 30 }, (_, i) => {
 // ─── MetricCard ───────────────────────────────────────────────────────────────
 
 function MetricCard({ name, value, idx, isDark, sparkData, minThreshold, maxThreshold }: {
-  name: string; value: number | undefined; idx: number; isDark: boolean; sparkData?: number[];
+  key?: React.Key; name: string; value: number | undefined; idx: number; isDark: boolean; sparkData?: number[];
   minThreshold?: number | null; maxThreshold?: number | null;
 }) {
   const p        = regPalette(name, idx);
+  const tk       = isDark ? T.dark : T.light;
   const hasVal   = value !== undefined && !isNaN(value);
   const abs      = hasVal ? Math.abs(value!) : 0;
   const display  = hasVal
     ? (abs >= 10000 ? value!.toFixed(0) : abs >= 100 ? value!.toFixed(1) : abs >= 1 ? value!.toFixed(2) : value!.toFixed(4))
-    : "——";
+    : "—";
   const isAlarm  = hasVal && (
     (maxThreshold != null && value! > maxThreshold) ||
     (minThreshold != null && value! < minThreshold)
   );
-  const accentColor = isAlarm ? CLR.red : p.border;
+  const accent = isAlarm ? tk.red : p.border;
 
   return (
-    <div style={{ ...glass(isDark), padding: 0, display: "flex", flexDirection: "column", minWidth: 0, overflow: "hidden", position: "relative", animation: isAlarm ? "pulse-alarm 1.5s ease-in-out infinite" : "none" }}>
-      <div style={{ height: "2px", width: "100%", flexShrink: 0, background: `linear-gradient(90deg, ${accentColor}, ${accentColor}88, transparent)` }} />
-      <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-        <div style={{ fontSize: "0.6rem", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.18em", textTransform: "uppercase", color: CLR.text3(isDark), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-        <div style={{ fontSize: "1.75rem", fontWeight: 700, fontFamily: "'Share Tech Mono',monospace", letterSpacing: "-0.03em", lineHeight: 1, color: hasVal ? CLR.text1(isDark) : CLR.text3(isDark) }}>{display}</div>
-        <div style={{ height: "2px", borderRadius: "1px", background: CLR.borderDim(isDark), overflow: "hidden" }}>
-          {hasVal && <div style={{ height: "100%", borderRadius: "1px", width: `${Math.min(100, (Math.abs(value!) / 500) * 100)}%`, background: `linear-gradient(90deg,${accentColor},${accentColor}99)`, transition: "width 0.5s ease" }} />}
+    <div className="pv-card-hover" style={{
+      background: tk.surface, border: `1px solid ${isAlarm ? tk.red + "66" : tk.border}`,
+      borderRadius: 16, boxShadow: tk.cardShadow, overflow: "hidden", position: "relative",
+      display: "flex", flexDirection: "column", minWidth: 0,
+      animation: isAlarm ? "pulse-alarm 1.5s ease-in-out infinite" : "none",
+    }}>
+      <div style={{ padding: "20px 20px 12px", display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ fontSize: 13, fontWeight: 500, color: tk.muted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", fontFamily: "'Inter',sans-serif" }}>
+            {name}
+          </div>
+          {isAlarm && (
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: tk.red, background: tk.redBg, borderRadius: 6, padding: "2px 6px" }}>
+              ALARM
+            </div>
+          )}
+        </div>
+
+        <div style={{ fontSize: 32, fontWeight: 600, letterSpacing: "-0.03em", lineHeight: 1, fontFamily: "'Inter',sans-serif", color: isAlarm ? tk.red : (hasVal ? tk.text : tk.muted2) }}>
+          {display}
         </div>
       </div>
+
       {sparkData && sparkData.length > 1 && (
-        <div style={{ padding: "0 16px 10px", marginTop: "-4px" }}>
-          <ResponsiveContainer width="100%" height={36}>
-            <LineChart data={sparkData.map((v, i) => ({ i, v }))} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-              <Line type="monotone" dataKey="v" stroke={accentColor} strokeWidth={1.5} dot={false} isAnimationActive={false} />
+        <div style={{ padding: "0 20px 16px", height: 40 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={sparkData.map((v, i) => ({ i, v }))}>
+              <Line type="monotone" dataKey="v" stroke={accent} strokeWidth={2} dot={false} isAnimationActive={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       )}
-      <div style={{ position: "absolute", bottom: 0, right: 0, width: "60px", height: "60px", background: `radial-gradient(circle at 100% 100%, ${accentColor}22, transparent 70%)`, pointerEvents: "none" }} />
     </div>
   );
 }
@@ -207,24 +283,38 @@ function DeviceTabBar({ devices, activeTab, onSelect, isLive, isDark, inactiveDe
   isLive: boolean; isDark: boolean;
   inactiveDevices: Set<string>; showAll: boolean; onToggleShowAll: () => void;
 }) {
+  const tk = isDark ? T.dark : T.light;
   const inactiveCount = inactiveDevices.size;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "4px", padding: "0 12px 0 20px", height: "48px", background: CLR.bgTabBar(isDark), borderBottom: `1px solid ${CLR.border(isDark)}`, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", overflowX: "auto", overflowY: "hidden", flexShrink: 0 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 24px",
+      background: tk.surface, borderBottom: `1px solid ${tk.border}`,
+      overflowX: "auto", overflowY: "hidden", flexShrink: 0 }}>
       {devices.map((name, i) => {
         const isActive   = activeTab === name;
         const isInactive = inactiveDevices.has(name);
         const accent     = TAB_ACCENTS[i % TAB_ACCENTS.length];
         return (
-          <button key={name} onClick={() => onSelect(name)} style={{ padding: "0 16px", height: "32px", border: isActive ? `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "rgba(15,23,42,0.12)"}` : "1px solid transparent", borderRadius: "8px", background: isActive ? (isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.95)") : "transparent", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px", whiteSpace: "nowrap", flexShrink: 0, transition: "all 0.15s ease", boxShadow: isActive ? (isDark ? "0 1px 6px rgba(0,0,0,0.4)" : "0 1px 4px rgba(15,23,42,0.12)") : "none", opacity: isInactive ? 0.4 : 1 }}>
-            <span style={{ width: "6px", height: "6px", borderRadius: "50%", flexShrink: 0, background: isActive ? (isLive && !isInactive ? accent : CLR.text3(isDark)) : CLR.text3(isDark), boxShadow: isActive && isLive && !isInactive ? `0 0 7px ${accent}` : "none", animation: isActive && isLive && !isInactive ? "pulse-dot 2s ease-in-out infinite" : "none" }} />
-            <span style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: isActive ? 700 : 500, fontSize: "0.83rem", letterSpacing: "0.04em", color: isActive ? CLR.text1(isDark) : CLR.text2(isDark) }}>{name}</span>
-            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.54rem", letterSpacing: "0.08em", color: isActive ? accent : CLR.text3(isDark), padding: "1px 6px", borderRadius: "20px", border: `1px solid ${isActive ? accent + "40" : CLR.border(isDark)}`, background: isActive ? accent + "10" : "transparent" }}>S{i + 1}</span>
+          <button key={name} onClick={() => onSelect(name)} style={{
+            padding: "8px 16px", border: `1px solid ${isActive ? accent + "44" : tk.border}`,
+            borderRadius: 20, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+            whiteSpace: "nowrap", flexShrink: 0, transition: "all 0.2s",
+            background: isActive ? (isDark ? accent + "18" : accent + "10") : "transparent",
+            opacity: isInactive ? 0.5 : 1,
+          }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+              background: isActive && isLive && !isInactive ? accent : tk.muted2,
+              boxShadow: isActive && isLive && !isInactive ? `0 0 8px ${accent}` : "none" }} />
+            <span style={{ fontFamily: "'Inter',sans-serif", fontWeight: isActive ? 600 : 500,
+              fontSize: 14, color: isActive ? accent : tk.text }}>{name}</span>
           </button>
         );
       })}
       {inactiveCount > 0 && (
-        <button onClick={onToggleShowAll} style={{ marginLeft: "auto", flexShrink: 0, padding: "0 12px", height: "26px", borderRadius: "6px", border: `1px solid ${showAll ? CLR.amber + "66" : CLR.border(isDark)}`, background: showAll ? CLR.amber + "18" : "transparent", color: showAll ? CLR.amber : CLR.text3(isDark), fontFamily: "'Share Tech Mono',monospace", fontSize: "0.56rem", letterSpacing: "0.1em", cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.15s" }}>
-          {showAll ? "HIDE INACTIVE" : `SHOW ALL (${inactiveCount} INACTIVE)`}
+        <button onClick={onToggleShowAll} style={{ marginLeft: "auto", flexShrink: 0, padding: "6px 12px",
+          borderRadius: 20, cursor: "pointer", whiteSpace: "nowrap", transition: "all 0.2s",
+          fontFamily: "'Inter',sans-serif", fontSize: 12, fontWeight: 500,
+          border: `1px solid ${tk.border}`, background: "transparent", color: tk.muted }}>
+          {showAll ? "Hide Inactive" : `+ ${inactiveCount} Inactive`}
         </button>
       )}
     </div>
@@ -233,8 +323,8 @@ function DeviceTabBar({ devices, activeTab, onSelect, isLive, isDark, inactiveDe
 
 // ─── WaveformChart ────────────────────────────────────────────────────────────
 
-function WaveformChart({ history, chartKeys, isLive, tabAccent, isDark }: {
-  history: ChartPoint[]; chartKeys: string[]; isLive: boolean; tabAccent: string; isDark: boolean;
+function WaveformChart({ history, chartKeys, isDark }: {
+  history: ChartPoint[]; chartKeys: string[]; isDark: boolean;
 }) {
   const [viewMode, setViewMode] = useState<ViewMode>("chart");
   const [chartVisibleVars, setChartVisibleVars] = useState<Set<string>>(() => new Set(chartKeys));
@@ -252,54 +342,38 @@ function WaveformChart({ history, chartKeys, isLive, tabAccent, isDark }: {
   }, [history]);
 
   const emptyState = (
-    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke={CLR.text3(isDark)} strokeWidth={1.5}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
-      <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.2em", color: CLR.text3(isDark), textTransform: "uppercase" }}>Awaiting data…</span>
+    <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12 }}>
+      <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke={CLR.text3(isDark)} strokeWidth={1.5}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+      <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 14, color: CLR.text3(isDark) }}>Waiting for data...</span>
     </div>
   );
 
   return (
-    <div style={{ ...glass(isDark), overflow: "hidden", display: "flex", flexDirection: "column" }}>
+    <div style={{ ...glass(isDark), overflow: "hidden", display: "flex", flexDirection: "column", borderRadius: 16 }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderBottom: `1px solid ${CLR.border(isDark)}`, flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke={tabAccent} strokeWidth={2.5}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
-          <span style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: "0.78rem", letterSpacing: "0.14em", textTransform: "uppercase", color: CLR.text1(isDark) }}>Waveform</span>
-          <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.58rem", color: CLR.text3(isDark) }}>{history.length}/{MAX_HISTORY}pts</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 24px", borderBottom: `1px solid ${CLR.border(isDark)}`, flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontFamily: "'Inter',sans-serif", fontWeight: 600, fontSize: 16, color: CLR.text1(isDark) }}>Waveform</span>
+          <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: CLR.text3(isDark) }}>{history.length} points</span>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           {/* View toggle */}
-          <div style={{ display: "flex", borderRadius: "6px", overflow: "hidden", border: `1px solid ${CLR.border(isDark)}` }}>
+          <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${CLR.border(isDark)}`, background: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.02)" }}>
             {(["chart", "grid"] as ViewMode[]).map((mode) => {
               const active = viewMode === mode;
               return (
-                <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: "3px 10px", height: "26px", background: active ? (isDark ? "rgba(255,255,255,0.10)" : "rgba(15,23,42,0.08)") : "transparent", border: "none", borderRight: mode === "chart" ? `1px solid ${CLR.border(isDark)}` : "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", color: active ? CLR.text1(isDark) : CLR.text3(isDark), transition: "background 0.15s" }}>
-                  {mode === "chart"
-                    ? <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth={2.2}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
-                    : <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth={2.2}><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="3" y1="15" x2="21" y2="15" /><line x1="9" y1="3" x2="9" y2="21" /></svg>}
-                  <span style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: active ? 700 : 500, fontSize: "0.68rem", letterSpacing: "0.06em" }}>{mode === "chart" ? "Chart" : "Grid"}</span>
+                <button key={mode} onClick={() => setViewMode(mode)} style={{ padding: "6px 16px", background: active ? (isDark ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.06)") : "transparent", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: active ? CLR.text1(isDark) : CLR.text3(isDark), transition: "background 0.2s" }}>
+                  <span style={{ fontFamily: "'Inter',sans-serif", fontWeight: active ? 600 : 500, fontSize: 13 }}>{mode === "chart" ? "Chart" : "Data Grid"}</span>
                 </button>
               );
             })}
           </div>
-          {/* Legend pills */}
-          {viewMode === "chart" && chartKeys.map((k, i) => (
-            <div key={k} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-              <div style={{ width: "10px", height: "3px", borderRadius: "2px", background: LINE_COLORS[i % LINE_COLORS.length] }} />
-              <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.58rem", color: CLR.text2(isDark), maxWidth: "120px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k}</span>
-            </div>
-          ))}
-          {/* Live badge */}
-          <span style={{ padding: "2px 8px", borderRadius: "4px", fontFamily: "'Share Tech Mono',monospace", fontSize: "0.56rem", letterSpacing: "0.12em", background: isLive ? tabAccent + "20" : CLR.borderDim(isDark), color: isLive ? tabAccent : CLR.text3(isDark), border: `1px solid ${isLive ? tabAccent + "44" : CLR.borderDim(isDark)}` }}>
-            {isLive ? "LIVE" : "DEMO"}
-          </span>
         </div>
       </div>
 
       {/* Chart var toggles */}
       {viewMode === "chart" && chartKeys.length > 0 && (
-        <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap", padding: "8px 16px", borderBottom: `1px solid ${CLR.border(isDark)}`, flexShrink: 0 }}>
-          <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.5rem", letterSpacing: "0.18em", textTransform: "uppercase", color: CLR.text3(isDark), marginRight: "2px" }}>LINES</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", padding: "12px 24px", borderBottom: `1px solid ${CLR.border(isDark)}`, flexShrink: 0 }}>
           {chartKeys.map((k, i) => {
             const on = chartVisibleVars.has(k);
             const c  = LINE_COLORS[i % LINE_COLORS.length];
@@ -307,9 +381,9 @@ function WaveformChart({ history, chartKeys, isLive, tabAccent, isDark }: {
               <button
                 key={k}
                 onClick={() => setChartVisibleVars((prev) => { const s = new Set(prev); s.has(k) ? s.delete(k) : s.add(k); return s; })}
-                style={{ padding: "3px 12px", height: "24px", borderRadius: "20px", background: on ? c + "22" : "transparent", border: `1px solid ${on ? c + "88" : CLR.border(isDark)}`, color: on ? c : CLR.text3(isDark), fontFamily: "'Share Tech Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.06em", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", transition: "all 0.12s" }}
+                style={{ padding: "4px 12px", borderRadius: 20, background: on ? c + "15" : "transparent", border: `1px solid ${on ? c + "40" : CLR.border(isDark)}`, color: on ? c : CLR.text3(isDark), fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: on ? 500 : 400, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s" }}
               >
-                <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: on ? c : CLR.borderDim(isDark), flexShrink: 0 }} />
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: on ? c : CLR.borderDim(isDark), flexShrink: 0 }} />
                 {k}
               </button>
             );
@@ -802,7 +876,6 @@ export default function ProjectView() {
   const activeLatest   = latestData[activeTab]   ?? {};
   const activeHistory  = history[activeTab]      ?? [];
   const activeSpark    = sparkHistory[activeTab] ?? {};
-  const tabAccent      = TAB_ACCENTS[devices.indexOf(activeTab) % TAB_ACCENTS.length] ?? CLR.blue;
   const timeStr        = lastPollMs > 0 ? new Date(lastPollMs).toLocaleTimeString("en-GB", { hour12: false }) : "--:--:--";
   const dataTimeStr    = lastDataMs  > 0 ? new Date(lastDataMs).toLocaleTimeString("en-GB",  { hour12: false }) : "--:--:--";
   const isLive         = !demoMode;
@@ -845,442 +918,471 @@ export default function ProjectView() {
     });
   }
 
-  const ctrlBtn = (accent?: string): React.CSSProperties => ({
-    display: "flex", alignItems: "center", gap: "6px",
-    padding: "0 12px", height: "34px", borderRadius: "6px", cursor: "pointer",
-    background: accent ? `${accent}18` : (isDark ? "rgba(255,255,255,0.05)" : "#f6f8fa"),
-    border: `1px solid ${accent ? accent + "44" : CLR.border(isDark)}`,
-    color: accent ?? CLR.text2(isDark),
-    fontFamily: "'Rajdhani',sans-serif", fontWeight: 600,
-    fontSize: "0.75rem", letterSpacing: "0.06em",
+  const tk = isDark ? T.dark : T.light;
+
+  const hdrBtn = (accent?: string): React.CSSProperties => ({
+    display: "flex", alignItems: "center", gap: 6,
+    padding: "0 12px", height: 34, borderRadius: 7, cursor: "pointer",
+    background: accent ? accent + "12" : tk.surfaceAlt,
+    border: `1px solid ${accent ? accent + "30" : tk.border}`,
+    color: accent ?? tk.muted,
+    fontFamily: "'Inter',sans-serif", fontWeight: 600,
+    fontSize: 13, letterSpacing: "0.01em", transition: "all 0.15s",
   });
 
   if (loading) {
     return (
-      <div data-theme={isDark ? "dark" : "light"} className="scada-page" style={{ height: "100svh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={CLR.blue} strokeWidth={2.5} style={{ animation: "spin-login 1s linear infinite" }}>
+      <div data-theme={isDark ? "dark" : "light"} className="scada-page"
+        style={{ height: "100svh", display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", gap: 16, background: tk.bg }}>
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
+          stroke={tk.accent} strokeWidth={2.5}
+          style={{ animation: "spin-pv 1s linear infinite" }}>
           <path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round" />
         </svg>
+        <span style={{ fontFamily: "'Inter',sans-serif", fontSize: 13,
+          color: tk.muted, fontWeight: 500 }}>Loading telemetry…</span>
       </div>
     );
   }
 
+  const statusColor = !isLive ? tk.amber : hasStopped ? tk.red : hasFault ? tk.amber : isVeryStale ? tk.red : isStale ? tk.amber : tk.green;
+  const statusLabel = !isLive ? "Demo" : hasStopped ? "Stopped" : hasFault ? "Fault" : isVeryStale ? "Offline" : isStale ? "Stale" : "Live";
+
   return (
-    <div data-theme={isDark ? "dark" : "light"} className="scada-page" style={{ height: "100svh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    <div data-theme={isDark ? "dark" : "light"} className="scada-page"
+      style={{ height: "100svh", display: "flex", flexDirection: "column",
+        overflow: "hidden", background: tk.bg, fontFamily: "'Inter',sans-serif" }}>
 
       {/* ══ Header ══ */}
-      <header style={{ display: "flex", alignItems: "center", gap: "14px", padding: "0 20px", height: "58px", flexShrink: 0, background: CLR.bgHeader(isDark), borderBottom: `1px solid ${CLR.border(isDark)}`, backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)", position: "relative", zIndex: 10 }}>
+      <header style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 24px",
+        height: 64, flexShrink: 0, background: tk.header,
+        borderBottom: `1px solid ${tk.border}`,
+        backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+        position: "relative", zIndex: 10 }}>
+
         {/* Back */}
-        <button onClick={() => navigate(backTo)} style={ctrlBtn()}>
-          <ChevronLeft size={14} /> {backTo === "/admin" ? "Fleet" : "Dashboard"}
+        <button onClick={() => navigate(backTo)} style={{ ...hdrBtn(), padding: "0 16px", borderRadius: 20 }}>
+          <ChevronLeft size={16} /> <span style={{ marginLeft: 4 }}>{backTo === "/admin" ? "Fleet" : "Dashboard"}</span>
         </button>
 
-        <div style={{ width: "1px", height: "24px", background: CLR.border(isDark) }} />
+        <div style={{ width: 1, height: 24, background: tk.border }} />
 
         {/* Brand + project */}
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: tk.accent,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 4px 12px ${tk.accent}44`, flexShrink: 0 }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" strokeWidth={2.5}>
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+          </div>
           <div>
-            <div style={{ fontFamily: "'Rajdhani',sans-serif", fontWeight: 700, fontSize: "0.9rem", letterSpacing: "0.06em", color: isDark ? "#e6edf3" : "#0f172a", lineHeight: 1 }}>TechniDAQ</div>
-            <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.5rem", letterSpacing: "0.14em", color: CLR.text3(isDark), lineHeight: 1.5 }}>{projectName}</div>
+            <div style={{ fontFamily: "'Inter',sans-serif",
+              fontWeight: 700, fontSize: 16, color: tk.text, letterSpacing: "-0.01em", lineHeight: 1.1 }}>{projectName}</div>
+            <div style={{ fontSize: 12, color: tk.muted, fontWeight: 500, lineHeight: 1.3 }}>TechniDAQ Monitoring</div>
           </div>
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }} />
+        <div style={{ flex: 1 }} />
 
-        {/* Right controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-          {/* Last poll */}
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.48rem", letterSpacing: "0.14em", color: CLR.text3(isDark), textTransform: "uppercase" }}>Last Poll</div>
-            <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.7rem", color: CLR.text1(isDark) }}>{timeStr}</div>
-          </div>
-
-          <div style={{ width: "1px", height: "28px", background: CLR.border(isDark) }} />
-
-          {/* Live / Stopped / Fault / Stale / Offline / Demo status */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "50%",
-              background: !isLive ? CLR.amber : hasStopped ? CLR.red : hasFault ? CLR.amber : isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green,
-              boxShadow: isLive && !hasStopped && !hasFault && !isStale ? `0 0 8px ${CLR.green}` : "none",
-              animation: isLive && !hasStopped && !hasFault && !isStale ? "pulse-dot 2s ease-in-out infinite" : "none" }} />
-            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.12em", fontWeight: 600,
-              color: !isLive ? CLR.amber : hasStopped ? CLR.red : hasFault ? CLR.amber : isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green }}>
-              {!isLive ? "DEMO" : hasStopped ? "STOPPED" : hasFault ? "FAULT" : isVeryStale ? "OFFLINE" : isStale ? "STALE" : "LIVE"}
-            </span>
-          </div>
-
-          {demoMode && (
-            <>
-              <div style={{ width: "1px", height: "28px", background: CLR.border(isDark) }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0 10px", height: "28px", background: `${CLR.amber}15`, border: `1px solid ${CLR.amber}44`, borderRadius: "5px" }}>
-                <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.56rem", letterSpacing: "0.14em", color: CLR.amber }}>DEMO MODE</span>
-              </div>
-            </>
-          )}
-
-          <div style={{ width: "1px", height: "28px", background: CLR.border(isDark) }} />
-
-          {/* Export */}
-          <button onClick={handleExport} disabled={exporting} style={{ ...ctrlBtn(CLR.green), opacity: exporting ? 0.6 : 1 }}>
-            <Download size={13} /> {exporting ? "Exporting…" : "Export Excel"}
-          </button>
-
-          {/* Configure Bus */}
-          <button onClick={openBusCfg} style={ctrlBtn(CLR.purple)}>
-            <Settings size={13} /> Configure Bus
-          </button>
-
-          {/* Theme */}
-          <button onClick={toggleTheme} style={{ ...ctrlBtn(), padding: "0 10px" }}>
-            {isDark ? <Sun size={14} /> : <Moon size={14} />}
-          </button>
-
-          <div style={{ width: "1px", height: "28px", background: CLR.border(isDark) }} />
-
-          {/* Logout */}
-          <button onClick={() => { localStorage.removeItem("token"); localStorage.removeItem("role"); navigate("/login"); }} style={{ ...ctrlBtn(CLR.red), padding: "0 10px", fontWeight: 600 }}>
-            <LogOut size={13} /> Log Out
-          </button>
+        {/* Status + last poll */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10,
+          padding: "0 16px", height: 36, borderRadius: 20,
+          background: tk.surfaceAlt, border: `1px solid ${tk.border}` }}>
+          <div style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor,
+            boxShadow: statusColor === tk.green ? `0 0 8px ${statusColor}` : "none",
+            animation: statusColor === tk.green ? "pulse-dot 2s ease-in-out infinite" : "none" }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: statusColor }}>{statusLabel}</span>
+          <div style={{ width: 1, height: 16, background: tk.border }} />
+          <span style={{ fontSize: 12, color: tk.muted, fontFamily: "'Inter',monospace" }}>{timeStr}</span>
         </div>
+
+        {demoMode && (
+          <div style={{ padding: "0 12px", height: 36, display: "flex", alignItems: "center",
+            borderRadius: 20, background: tk.amberBg, border: `1px solid ${tk.amberBdr}` }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: tk.amber, letterSpacing: "0.04em" }}>DEMO MODE</span>
+          </div>
+        )}
+
+        <div style={{ width: 1, height: 24, background: tk.border }} />
+
+        {/* Export */}
+        <button onClick={handleExport} disabled={exporting}
+          style={{ ...hdrBtn(tk.green), opacity: exporting ? 0.6 : 1, borderRadius: 20 }}>
+          <Download size={14} /> <span style={{ marginLeft: 4 }}>{exporting ? "Exporting…" : "Export"}</span>
+        </button>
+
+        {/* Configure Bus */}
+        <button onClick={openBusCfg} style={{ ...hdrBtn(tk.purple), borderRadius: 20 }}>
+          <Settings size={14} /> <span style={{ marginLeft: 4 }}>Configure Bus</span>
+        </button>
+
+        {/* Theme */}
+        <button onClick={toggleTheme} style={{ ...hdrBtn(), padding: "0 12px", borderRadius: 20 }}
+          title={isDark ? "Switch to light mode" : "Switch to dark mode"}>
+          {isDark ? <Sun size={16} /> : <Moon size={16} />}
+        </button>
+
+        <div style={{ width: 1, height: 24, background: tk.border }} />
+
+        {/* Logout */}
+        <button
+          onClick={() => { localStorage.removeItem("token"); localStorage.removeItem("role"); navigate("/login"); }}
+          style={{ ...hdrBtn(tk.red), borderRadius: 20 }}>
+          <LogOut size={14} /> <span style={{ marginLeft: 4 }}>Log Out</span>
+        </button>
       </header>
 
-      {/* ══ Node polling-state banners (immediate, from API) ══ */}
+      {/* ══ Status Banners ══ */}
       {hasStopped && (
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 20px", flexShrink: 0, background: CLR.red + "22", borderBottom: `2px solid ${CLR.red}55`, color: CLR.red, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.7rem", letterSpacing: "0.08em", fontWeight: 700 }}>
-          <span style={{ fontSize: "1rem", lineHeight: 1 }}>⚠</span>
-          <span>POLLING STOPPED — The monitoring device has stopped data collection{stoppedNode?.last_seen ? ` · last seen ${new Date(stoppedNode.last_seen).toLocaleTimeString("en-GB", { hour12: false })}` : ""}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px",
+          flexShrink: 0, background: tk.redBg, borderBottom: `1px solid ${tk.redBdr}`,
+          color: tk.red, fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: 600 }}>
+          ⚠ Polling stopped — monitoring device has stopped data collection
+          {stoppedNode?.last_seen ? ` · last seen ${new Date(stoppedNode.last_seen).toLocaleTimeString("en-GB", { hour12: false })}` : ""}
         </div>
       )}
       {hasFault && (
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 20px", flexShrink: 0, background: CLR.amber + "1a", borderBottom: `2px solid ${CLR.amber}44`, color: CLR.amber, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.7rem", letterSpacing: "0.08em", fontWeight: 700 }}>
-          <span style={{ fontSize: "1rem", lineHeight: 1 }}>⚠</span>
-          <span>DEVICE FAULT — The monitoring device has encountered an error</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px",
+          flexShrink: 0, background: tk.amberBg, borderBottom: `1px solid ${tk.amberBdr}`,
+          color: tk.amber, fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: 600 }}>
+          ⚠ Device fault — monitoring device has encountered an error
         </div>
       )}
-
-      {/* ══ Stale-time banners (fallback when nodes not in response) ══ */}
       {isVeryStale && (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 20px", flexShrink: 0, background: CLR.red + "18", borderBottom: `1px solid ${CLR.red}44`, color: CLR.red, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.08em" }}>
-          <span>⚠</span>
-          <span>No data received for {staleMinutes} minute{staleMinutes !== 1 ? "s" : ""} — the monitoring device may be offline</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px",
+          flexShrink: 0, background: tk.redBg, borderBottom: `1px solid ${tk.redBdr}`,
+          color: tk.red, fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: 600 }}>
+          ⚠ No data for {staleMinutes} minute{staleMinutes !== 1 ? "s" : ""} — device may be offline
         </div>
       )}
       {isStale && !isVeryStale && (
-        <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 20px", flexShrink: 0, background: CLR.amber + "15", borderBottom: `1px solid ${CLR.amber}44`, color: CLR.amber, fontFamily: "'Share Tech Mono',monospace", fontSize: "0.65rem", letterSpacing: "0.08em" }}>
-          <span>⚠</span>
-          <span>Polling appears to have stopped — last data received at {dataTimeStr}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 20px",
+          flexShrink: 0, background: tk.amberBg, borderBottom: `1px solid ${tk.amberBdr}`,
+          color: tk.amber, fontFamily: "'Inter',sans-serif", fontSize: 13, fontWeight: 600 }}>
+          ⚠ Polling may have stopped — last data at {dataTimeStr}
         </div>
       )}
 
       {/* ══ Device Tab Bar ══ */}
       {devices.length > 0 && (
-        <DeviceTabBar devices={visibleDevices} activeTab={activeTab} onSelect={setActiveTab} isLive={isLive} isDark={isDark} inactiveDevices={inactiveDeviceSet} showAll={showAllDevices} onToggleShowAll={handleToggleShowAll} />
+        <DeviceTabBar devices={visibleDevices} activeTab={activeTab} onSelect={setActiveTab}
+          isLive={isLive} isDark={isDark} inactiveDevices={inactiveDeviceSet}
+          showAll={showAllDevices} onToggleShowAll={handleToggleShowAll} />
       )}
 
       {/* ══ Content ══ */}
-      <div style={{ flex: 1, overflow: "auto", padding: "16px 20px", display: "flex", flexDirection: "column", gap: "16px" }}>
+      <div style={{ flex: 1, overflow: "auto", padding: "20px 24px",
+        display: "flex", flexDirection: "column", gap: 20 }}>
 
-        {/* Fetch / export errors */}
+        {/* Errors */}
         {fetchError && (
-          <div style={{ padding: "10px 14px", borderRadius: 8, background: `${CLR.red}15`, border: `1px solid ${CLR.red}40`, color: CLR.red, fontSize: "0.75rem", fontFamily: "'Inter',sans-serif" }}>
+          <div style={{ padding: "10px 14px", borderRadius: 8, background: tk.redBg,
+            border: `1px solid ${tk.redBdr}`, color: tk.red, fontSize: 13 }}>
             {fetchError}
           </div>
         )}
         {exportError && (
-          <div style={{ padding: "10px 14px", borderRadius: 8, background: `${CLR.red}15`, border: `1px solid ${CLR.red}40`, color: CLR.red, fontSize: "0.75rem", fontFamily: "'Inter',sans-serif" }}>
+          <div style={{ padding: "10px 14px", borderRadius: 8, background: tk.redBg,
+            border: `1px solid ${tk.redBdr}`, color: tk.red, fontSize: 13 }}>
             {exportError}
           </div>
         )}
 
-        {/* Variable pills */}
-        {activeDevVars.length > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.5rem", letterSpacing: "0.18em", textTransform: "uppercase", color: CLR.text3(isDark), marginRight: "2px" }}>SHOW</span>
-            {activeDevVars.map((v, i) => {
-              const on = !hiddenVars.has(v);
-              const c  = LINE_COLORS[i % LINE_COLORS.length];
-              return (
-                <button
-                  key={v}
-                  onClick={() => setHiddenVars((prev) => { const s = new Set(prev); s.has(v) ? s.delete(v) : s.add(v); return s; })}
-                  style={{ padding: "3px 12px", height: "24px", borderRadius: "20px", background: on ? c + "22" : "transparent", border: `1px solid ${on ? c + "88" : CLR.border(isDark)}`, color: on ? c : CLR.text3(isDark), fontFamily: "'Share Tech Mono',monospace", fontSize: "0.58rem", letterSpacing: "0.06em", cursor: "pointer", display: "flex", alignItems: "center", gap: "5px", transition: "all 0.12s" }}
-                >
-                  <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: on ? c : CLR.borderDim(isDark), flexShrink: 0 }} />
-                  {v}
-                </button>
-              );
-            })}
-          </div>
-        )}
+        {/* Toolbar row: variable filter pills + last-updated */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+          flexWrap: "wrap", gap: 16 }}>
+          {activeDevVars.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: tk.muted,
+                letterSpacing: "0.05em", textTransform: "uppercase", marginRight: 8 }}>Metrics</span>
+              {activeDevVars.map((v, i) => {
+                const on = !hiddenVars.has(v);
+                const c  = LINE_COLORS[i % LINE_COLORS.length];
+                return (
+                  <button key={v}
+                    onClick={() => setHiddenVars((prev) => { const s = new Set(prev); s.has(v) ? s.delete(v) : s.add(v); return s; })}
+                    style={{ padding: "6px 14px", borderRadius: 20,
+                      background: on ? c + "15" : "transparent",
+                      border: `1px solid ${on ? c + "40" : tk.border}`,
+                      color: on ? c : tk.muted, fontFamily: "'Inter',sans-serif",
+                      fontSize: 13, fontWeight: on ? 600 : 500, cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s" }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%",
+                      background: on ? c : tk.border, flexShrink: 0 }} />
+                    {v}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {!demoMode && lastDataMs > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%",
+                background: isVeryStale ? tk.red : isStale ? tk.amber : tk.green,
+                boxShadow: isStale ? "none" : `0 0 8px ${tk.green}`,
+                animation: isStale ? "none" : "pulse-dot 2s ease-in-out infinite", flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: isVeryStale ? tk.red : isStale ? tk.amber : tk.muted }}>
+                {isVeryStale ? `Stopped · last data ${dataTimeStr}` : isStale ? "Data may be stale" : `Updated ${dataTimeStr}`}
+              </span>
+            </div>
+          )}
+        </div>
 
-        {/* Last updated — visible near the data so users know polling is live */}
-        {!demoMode && lastDataMs > 0 && (
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.green, boxShadow: isStale ? "none" : `0 0 6px ${CLR.green}`, animation: isStale ? "none" : "pulse-dot 2s ease-in-out infinite", flexShrink: 0 }} />
-            <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: "0.6rem", letterSpacing: "0.14em", color: isVeryStale ? CLR.red : isStale ? CLR.amber : CLR.text2(isDark), textTransform: "uppercase" }}>
-              {isVeryStale
-                ? `Polling appears stopped — last data at ${dataTimeStr}`
-                : isStale
-                ? "Data may be stale"
-                : `Last updated: ${dataTimeStr}`}
-            </span>
-          </div>
-        )}
-
-        {/* Metric cards — only visible vars */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 175px), 1fr))", gap: "12px" }}>
+        {/* Metric cards */}
+        <div style={{ display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 190px), 1fr))", gap: 14 }}>
           {visibleVars.map((varName, idx) => (
-            <MetricCard
-              key={varName}
-              name={varName}
-              value={activeLatest[varName]}
-              idx={idx}
-              isDark={isDark}
-              sparkData={activeSpark[varName]}
+            <MetricCard key={varName} name={varName} value={activeLatest[varName]}
+              idx={idx} isDark={isDark} sparkData={activeSpark[varName]}
               minThreshold={thresholds[activeTab]?.[varName]?.min}
-              maxThreshold={thresholds[activeTab]?.[varName]?.max}
-            />
+              maxThreshold={thresholds[activeTab]?.[varName]?.max} />
           ))}
         </div>
 
-        {/* Waveform chart — only visible vars */}
-        <div style={{ minHeight: 380 }}>
-          <WaveformChart
-            history={activeHistory}
-            chartKeys={visibleVars}
-            isLive={isLive}
-            tabAccent={tabAccent}
-            isDark={isDark}
-          />
+        {/* Waveform chart */}
+        <div style={{ minHeight: 400 }}>
+          <WaveformChart history={activeHistory} chartKeys={visibleVars} isDark={isDark} />
         </div>
       </div>
 
+
       {/* ══ Bus Config Modal ══ */}
       {busCfgOpen && (() => {
-        const mInp: React.CSSProperties = { width: "100%", padding: "8px 10px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#f8fafc", color: "#0f172a", fontSize: 13, outline: "none", boxSizing: "border-box" as const };
-        const mLbl: React.CSSProperties = { display: "block", fontSize: 10, fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase" as const, marginBottom: 4 };
+        const mInp: React.CSSProperties = { width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #e2e8f0", background: "#f8fafc", color: "#0f172a", fontSize: 14, outline: "none", boxSizing: "border-box" as const, transition: "all 0.2s" };
+        const mLbl: React.CSSProperties = { display: "block", fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.05em", textTransform: "uppercase" as const, marginBottom: 6 };
         const allowedProtos: ("rtu" | "tcp")[] = busCfgProtocols === "RTU" ? ["rtu"] : busCfgProtocols === "TCP" ? ["tcp"] : ["rtu", "tcp"];
         return (
-          <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(4px)" }}>
-            <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 18, boxShadow: "0 8px 40px rgba(0,0,0,0.18)", maxWidth: 680, width: "95%", maxHeight: "92vh", overflowY: "auto", padding: 28, position: "relative" }}>
-
-              {/* Close */}
-              <button onClick={() => setBusCfgOpen(false)} style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", color: "#64748b", cursor: "pointer", display: "flex" }}><X size={18} /></button>
-
+          <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,0.6)", backdropFilter: "blur(8px)" }}>
+            <div style={{ background: "#ffffff", borderRadius: 24, boxShadow: "0 20px 60px rgba(0,0,0,0.15)", maxWidth: 720, width: "95%", maxHeight: "90vh", overflowY: "auto", position: "relative", display: "flex", flexDirection: "column" }}>
+              
               {/* Header */}
-              <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 18, color: "#0f172a", marginBottom: 2 }}>Configure Bus</div>
-              <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 12, color: "#64748b", marginBottom: 20 }}>{projectName}</div>
-
-              {/* Loading */}
-              {busCfgLoading && (
-                <div style={{ display: "flex", justifyContent: "center", padding: "32px 0" }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={CLR.blue} strokeWidth={2.5} style={{ animation: "spin-login 1s linear infinite" }}>
-                    <path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round" />
-                  </svg>
-                </div>
-              )}
-
-              {/* Node selector */}
-              {!busCfgLoading && !busCfgMachineId && busCfgNodes.length > 1 && (
+              <div style={{ padding: "24px 32px", borderBottom: "1px solid #f1f5f9", display: "flex", alignItems: "center", justifyContent: "space-between", position: "sticky", top: 0, background: "#ffffff", zIndex: 10 }}>
                 <div>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>Select Node</div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {busCfgNodes.map((node) => (
-                      <button key={node.machine_id} onClick={() => loadNodeConfig(node.machine_id, busCfgProfiles)}
-                        style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "12px 16px", borderRadius: 10, border: "1px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", textAlign: "left" }}>
-                        <span style={{ fontWeight: 600, fontSize: 14, color: "#0f172a" }}>{node.node_name || node.machine_id}</span>
-                        <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: "#64748b", marginTop: 2 }}>{node.machine_id}</span>
-                      </button>
-                    ))}
-                  </div>
+                  <h2 style={{ fontFamily: "'Inter',sans-serif", fontWeight: 700, fontSize: 20, color: "#0f172a", margin: 0 }}>Configure Bus</h2>
+                  <p style={{ fontFamily: "'Inter',sans-serif", fontSize: 13, color: "#64748b", margin: "4px 0 0 0" }}>{projectName}</p>
                 </div>
-              )}
+                <button title="Close" onClick={() => setBusCfgOpen(false)} style={{ background: "#f1f5f9", border: "none", color: "#64748b", cursor: "pointer", display: "flex", padding: 8, borderRadius: "50%", transition: "all 0.2s" }} onMouseOver={(e) => e.currentTarget.style.background = "#e2e8f0"} onMouseOut={(e) => e.currentTarget.style.background = "#f1f5f9"}><X size={20} /></button>
+              </div>
 
-              {/* No nodes */}
-              {!busCfgLoading && !busCfgMachineId && busCfgNodes.length === 0 && !busCfgError && (
-                <div style={{ fontSize: 13, color: "#64748b", padding: "20px 0" }}>No active nodes found for this project.</div>
-              )}
-
-              {/* Device list */}
-              {!busCfgLoading && busCfgMachineId && (
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase" }}>Devices</div>
-                      <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{busCfgMachineId}</div>
-                    </div>
-                    <button onClick={addBusCfgDevice}
-                      style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: 7, border: `1px solid ${CLR.blue}44`, background: `${CLR.blue}10`, color: CLR.blue, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-                      <Plus size={13} /> Add Device
-                    </button>
+              <div style={{ padding: "32px", flex: 1 }}>
+                {/* Loading */}
+                {busCfgLoading && (
+                  <div style={{ display: "flex", justifyContent: "center", padding: "40px 0" }}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={tk.accent} strokeWidth={2.5} style={{ animation: "spin-pv 1s linear infinite" }}>
+                      <path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round" />
+                    </svg>
                   </div>
+                )}
 
-                  {busCfgDevices.length === 0 && (
-                    <div style={{ fontSize: 13, color: "#94a3b8", padding: "12px 0 20px" }}>No devices configured. Click "Add Device" to begin.</div>
-                  )}
-
-                  {busCfgDevices.map((dev, di) => (
-                    <div key={di} style={{ border: "1px solid #e2e8f0", borderRadius: 12, padding: 16, marginBottom: 14, background: "#fafcff" }}>
-
-                      {/* Device header */}
-                      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                        <input value={dev.device_name} onChange={(e) => updateBusCfgDevice(di, { device_name: e.target.value })}
-                          placeholder="Device name (e.g. Main Incomer)"
-                          style={{ ...mInp, flex: 1, fontWeight: 600 }}
-                          onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                          onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
-                        <button onClick={() => removeBusCfgDevice(di)}
-                          style={{ display: "flex", alignItems: "center", padding: "7px", borderRadius: 6, border: "1px solid #fecaca", background: "#fef2f2", color: "#dc2626", cursor: "pointer", flexShrink: 0 }}>
-                          <Trash2 size={14} />
+                {/* Node selector */}
+                {!busCfgLoading && !busCfgMachineId && busCfgNodes.length > 1 && (
+                  <div>
+                    <h3 style={{ fontSize: 13, fontWeight: 600, color: "#64748b", letterSpacing: "0.05em", textTransform: "uppercase", marginBottom: 16, marginTop: 0 }}>Select Node</h3>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
+                      {busCfgNodes.map((node) => (
+                        <button key={node.machine_id} onClick={() => loadNodeConfig(node.machine_id, busCfgProfiles)}
+                          style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", padding: "16px 20px", borderRadius: 12, border: "1px solid #e2e8f0", background: "#f8fafc", cursor: "pointer", textAlign: "left", transition: "all 0.2s" }}
+                          onMouseOver={(e) => { e.currentTarget.style.borderColor = CLR.blue; e.currentTarget.style.boxShadow = `0 4px 12px ${CLR.blue}15`; }}
+                          onMouseOut={(e) => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow = "none"; }}>
+                          <span style={{ fontWeight: 600, fontSize: 15, color: "#0f172a" }}>{node.node_name || node.machine_id}</span>
+                          <span style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 12, color: "#64748b", marginTop: 4 }}>{node.machine_id}</span>
                         </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* No nodes */}
+                {!busCfgLoading && !busCfgMachineId && busCfgNodes.length === 0 && !busCfgError && (
+                  <div style={{ padding: "40px", textAlign: "center", background: "#f8fafc", borderRadius: 16, border: "1px dashed #cbd5e1" }}>
+                    <p style={{ fontSize: 14, color: "#64748b", margin: 0 }}>No active nodes found for this project.</p>
+                  </div>
+                )}
+
+                {/* Device list */}
+                {!busCfgLoading && busCfgMachineId && (
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                      <div>
+                        <h3 style={{ fontSize: 13, fontWeight: 600, color: "#64748b", letterSpacing: "0.05em", textTransform: "uppercase", margin: 0 }}>Devices</h3>
+                        <div style={{ fontFamily: "'Share Tech Mono',monospace", fontSize: 12, color: "#94a3b8", marginTop: 4 }}>Node: {busCfgMachineId}</div>
                       </div>
+                      <button onClick={addBusCfgDevice}
+                        style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 16px", borderRadius: 8, border: "none", background: CLR.blue, color: "#ffffff", fontWeight: 600, fontSize: 14, cursor: "pointer", transition: "all 0.2s" }}
+                        onMouseOver={(e) => e.currentTarget.style.background = "#1550e6"}
+                        onMouseOut={(e) => e.currentTarget.style.background = CLR.blue}>
+                        <Plus size={16} /> Add Device
+                      </button>
+                    </div>
 
-                      {/* Meter model + Slave ID */}
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: 10, marginBottom: 10 }}>
-                        <div>
-                          <label style={mLbl}>Meter Model</label>
-                          <select value={dev.meter_model} onChange={(e) => updateBusCfgDevice(di, { meter_model: e.target.value })}
-                            style={{ ...mInp }}
-                            onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                            onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }}>
-                            <option value="">— Select —</option>
-                            {busCfgProfiles.map((p) => (
-                              <option key={p.model} value={p.model.toLowerCase()}>{p.display_name}</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label style={mLbl}>Slave ID</label>
-                          <input type="number" min={1} max={247} value={dev.slave_id} onChange={(e) => updateBusCfgDevice(di, { slave_id: Number(e.target.value) })}
-                            style={mInp}
-                            onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                            onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
-                        </div>
+                    {busCfgDevices.length === 0 && (
+                      <div style={{ padding: "40px", textAlign: "center", background: "#f8fafc", borderRadius: 16, border: "1px dashed #cbd5e1", marginBottom: 24 }}>
+                        <p style={{ fontSize: 14, color: "#64748b", margin: 0 }}>No devices configured. Click "Add Device" to begin.</p>
                       </div>
+                    )}
 
-                      {/* Poll rate */}
-                      <div style={{ marginBottom: 10 }}>
-                        <label style={mLbl}>Poll Rate (ms)</label>
-                        <input type="number" min={500} value={dev.poll_rate_ms} onChange={(e) => updateBusCfgDevice(di, { poll_rate_ms: Number(e.target.value) })}
-                          style={mInp}
-                          onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                          onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
-                      </div>
-
-                      {/* Protocol toggle */}
-                      <div style={{ marginBottom: 10 }}>
-                        <label style={mLbl}>Protocol</label>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          {allowedProtos.map((proto) => {
-                            const active = dev.protocol === proto;
-                            return (
-                              <button key={proto} type="button" onClick={() => updateBusCfgDevice(di, { protocol: proto })}
-                                style={{ padding: "6px 18px", borderRadius: 6, border: `1px solid ${active ? "#2563eb" : "#e2e8f0"}`, background: active ? "#eff6ff" : "#f8fafc", color: active ? "#2563eb" : "#64748b", fontWeight: 600, fontSize: 12, cursor: "pointer", textTransform: "uppercase" as const }}>
-                                {proto.toUpperCase()}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* RTU fields */}
-                      {dev.protocol === "rtu" && (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 120px", gap: 10, marginBottom: 10 }}>
-                          <div>
-                            <label style={mLbl}>COM Port</label>
-                            <input value={dev.com_port} onChange={(e) => updateBusCfgDevice(di, { com_port: e.target.value })}
-                              placeholder="COM3" style={mInp}
-                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                              onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                      {busCfgDevices.map((dev, di) => (
+                        <div key={di} style={{ border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden", background: "#ffffff", boxShadow: "0 2px 8px rgba(15,23,42,0.04)" }}>
+                          
+                          {/* Device header */}
+                          <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "16px 20px", background: "#f8fafc", borderBottom: "1px solid #e2e8f0" }}>
+                            <div style={{ width: 32, height: 32, borderRadius: 8, background: `${CLR.blue}15`, color: CLR.blue, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14 }}>
+                              {di + 1}
+                            </div>
+                            <input value={dev.device_name} onChange={(e) => updateBusCfgDevice(di, { device_name: e.target.value })}
+                              placeholder="Device name (e.g. Main Incomer)"
+                              style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 16, fontWeight: 600, color: "#0f172a", padding: 0 }} />
+                            <button onClick={() => removeBusCfgDevice(di)} title="Remove Device"
+                              style={{ display: "flex", alignItems: "center", padding: 8, borderRadius: 8, border: "none", background: "transparent", color: "#94a3b8", cursor: "pointer", transition: "all 0.2s" }}
+                              onMouseOver={(e) => { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.color = "#dc2626"; }}
+                              onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#94a3b8"; }}>
+                              <Trash2 size={16} />
+                            </button>
                           </div>
-                          <div>
-                            <label style={mLbl}>Baud Rate</label>
-                            <select value={dev.baud_rate} onChange={(e) => updateBusCfgDevice(di, { baud_rate: Number(e.target.value) })}
-                              style={mInp}
-                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                              onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }}>
-                              {[1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200].map((b) => (
-                                <option key={b} value={b}>{b}</option>
-                              ))}
-                            </select>
-                          </div>
-                        </div>
-                      )}
 
-                      {/* TCP fields */}
-                      {dev.protocol === "tcp" && (
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px", gap: 10, marginBottom: 10 }}>
-                          <div>
-                            <label style={mLbl}>IP Address</label>
-                            <input value={dev.ip_address} onChange={(e) => updateBusCfgDevice(di, { ip_address: e.target.value })}
-                              placeholder="192.168.1.100" style={mInp}
-                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                              onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
-                          </div>
-                          <div>
-                            <label style={mLbl}>Port</label>
-                            <input type="number" min={1} max={65535} value={dev.tcp_port} onChange={(e) => updateBusCfgDevice(di, { tcp_port: Number(e.target.value) })}
-                              style={mInp}
-                              onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                              onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
-                          </div>
-                        </div>
-                      )}
+                          <div style={{ padding: 20 }}>
+                            {/* Connection Settings */}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 20 }}>
+                              <div>
+                                <label style={mLbl}>Meter Model</label>
+                                <select value={dev.meter_model} onChange={(e) => updateBusCfgDevice(di, { meter_model: e.target.value })}
+                                  style={mInp} onFocus={(e) => e.target.style.borderColor = CLR.blue} onBlur={(e) => e.target.style.borderColor = "#e2e8f0"}>
+                                  <option value="">— Select Model —</option>
+                                  {busCfgProfiles.map((p) => (
+                                    <option key={p.model} value={p.model.toLowerCase()}>{p.display_name}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div>
+                                <label style={mLbl}>Slave ID</label>
+                                <input type="number" min={1} max={247} value={dev.slave_id} onChange={(e) => updateBusCfgDevice(di, { slave_id: Number(e.target.value) })}
+                                  style={mInp} onFocus={(e) => e.target.style.borderColor = CLR.blue} onBlur={(e) => e.target.style.borderColor = "#e2e8f0"} />
+                              </div>
+                              <div>
+                                <label style={mLbl}>Poll Rate (ms)</label>
+                                <input type="number" min={500} value={dev.poll_rate_ms} onChange={(e) => updateBusCfgDevice(di, { poll_rate_ms: Number(e.target.value) })}
+                                  style={mInp} onFocus={(e) => e.target.style.borderColor = CLR.blue} onBlur={(e) => e.target.style.borderColor = "#e2e8f0"} />
+                              </div>
+                            </div>
 
-                      {/* Register checklist */}
-                      {dev.registers.length > 0 && (
-                        <div style={{ marginTop: 12 }}>
-                          <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 8 }}>Registers</div>
-                          {dev.registers.map((reg, ri) => (
-                            <div key={ri} style={{ marginBottom: 8 }}>
-                              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-                                <div onClick={() => toggleBusCfgRegister(di, ri)}
-                                  style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${reg.selected ? "#2563eb" : "#e2e8f0"}`, background: reg.selected ? "#eff6ff" : "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "all 0.15s" }}>
-                                  {reg.selected && <Check size={10} color="#2563eb" />}
-                                </div>
-                                <span style={{ fontSize: 13, color: reg.selected ? "#0f172a" : "#64748b", fontFamily: "'Share Tech Mono',monospace" }}>{reg.name}</span>
-                              </label>
-                              {reg.selected && (
-                                <div style={{ display: "flex", gap: 8, marginLeft: 27, marginTop: 4 }}>
-                                  <div style={{ flex: 1 }}>
-                                    <label style={{ display: "block", fontSize: 10, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 2 }}>Alarm Min</label>
-                                    <input type="number" value={reg.alarm_min} onChange={(e) => updateBusCfgRegisterAlarm(di, ri, "alarm_min", e.target.value)}
-                                      placeholder="—" style={{ ...mInp, padding: "5px 8px", fontSize: 12 }}
-                                      onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                                      onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                            <div style={{ height: 1, background: "#f1f5f9", margin: "0 -20px 20px -20px" }} />
+
+                            {/* Protocol Settings */}
+                            <div style={{ marginBottom: 20 }}>
+                              <label style={mLbl}>Protocol</label>
+                              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                                {allowedProtos.map((proto) => {
+                                  const active = dev.protocol === proto;
+                                  return (
+                                    <button key={proto} type="button" onClick={() => updateBusCfgDevice(di, { protocol: proto })}
+                                      style={{ padding: "8px 24px", borderRadius: 8, border: `1px solid ${active ? CLR.blue : "#cbd5e1"}`, background: active ? `${CLR.blue}10` : "#ffffff", color: active ? CLR.blue : "#64748b", fontWeight: 600, fontSize: 13, cursor: "pointer", textTransform: "uppercase" as const, transition: "all 0.2s" }}>
+                                      {proto.toUpperCase()}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* RTU fields */}
+                              {dev.protocol === "rtu" && (
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: 16, background: "#f8fafc", borderRadius: 12, border: "1px solid #f1f5f9" }}>
+                                  <div>
+                                    <label style={mLbl}>COM Port</label>
+                                    <input value={dev.com_port} onChange={(e) => updateBusCfgDevice(di, { com_port: e.target.value })}
+                                      placeholder="e.g. COM3 or /dev/ttyUSB0" style={mInp} onFocus={(e) => e.target.style.borderColor = CLR.blue} onBlur={(e) => e.target.style.borderColor = "#e2e8f0"} />
                                   </div>
-                                  <div style={{ flex: 1 }}>
-                                    <label style={{ display: "block", fontSize: 10, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginBottom: 2 }}>Alarm Max</label>
-                                    <input type="number" value={reg.alarm_max} onChange={(e) => updateBusCfgRegisterAlarm(di, ri, "alarm_max", e.target.value)}
-                                      placeholder="—" style={{ ...mInp, padding: "5px 8px", fontSize: 12 }}
-                                      onFocus={(e) => { e.target.style.borderColor = "#93c5fd"; }}
-                                      onBlur={(e) => { e.target.style.borderColor = "#e2e8f0"; }} />
+                                  <div>
+                                    <label style={mLbl}>Baud Rate</label>
+                                    <select value={dev.baud_rate} onChange={(e) => updateBusCfgDevice(di, { baud_rate: Number(e.target.value) })}
+                                      style={mInp} onFocus={(e) => e.target.style.borderColor = CLR.blue} onBlur={(e) => e.target.style.borderColor = "#e2e8f0"}>
+                                      {[1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200].map((b) => (
+                                        <option key={b} value={b}>{b}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* TCP fields */}
+                              {dev.protocol === "tcp" && (
+                                <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 16, padding: 16, background: "#f8fafc", borderRadius: 12, border: "1px solid #f1f5f9" }}>
+                                  <div>
+                                    <label style={mLbl}>IP Address</label>
+                                    <input value={dev.ip_address} onChange={(e) => updateBusCfgDevice(di, { ip_address: e.target.value })}
+                                      placeholder="192.168.1.100" style={mInp} onFocus={(e) => e.target.style.borderColor = CLR.blue} onBlur={(e) => e.target.style.borderColor = "#e2e8f0"} />
+                                  </div>
+                                  <div>
+                                    <label style={mLbl}>Port</label>
+                                    <input type="number" min={1} max={65535} value={dev.tcp_port} onChange={(e) => updateBusCfgDevice(di, { tcp_port: Number(e.target.value) })}
+                                      style={mInp} onFocus={(e) => e.target.style.borderColor = CLR.blue} onBlur={(e) => e.target.style.borderColor = "#e2e8f0"} />
                                   </div>
                                 </div>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
 
-              {/* Error / success */}
-              {busCfgError   && <div style={{ padding: "9px 12px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, color: "#dc2626", fontSize: 13, marginBottom: 14 }}>{busCfgError}</div>}
-              {busCfgSuccess && <div style={{ padding: "9px 12px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, color: "#16a34a", fontSize: 13, marginBottom: 14 }}>{busCfgSuccess}</div>}
+                            {/* Register checklist */}
+                            {dev.registers.length > 0 && (
+                              <div>
+                                <div style={{ height: 1, background: "#f1f5f9", margin: "0 -20px 20px -20px" }} />
+                                <label style={mLbl}>Registers & Alarms</label>
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                  {dev.registers.map((reg, ri) => (
+                                    <div key={ri} style={{ padding: 12, borderRadius: 8, border: `1px solid ${reg.selected ? `${CLR.blue}40` : "#e2e8f0"}`, background: reg.selected ? `${CLR.blue}05` : "#ffffff", transition: "all 0.2s" }}>
+                                      <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                                        <div onClick={() => toggleBusCfgRegister(di, ri)}
+                                          style={{ width: 20, height: 20, borderRadius: 6, border: `2px solid ${reg.selected ? CLR.blue : "#cbd5e1"}`, background: reg.selected ? CLR.blue : "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s" }}>
+                                          {reg.selected && <Check size={14} color="#ffffff" strokeWidth={3} />}
+                                        </div>
+                                        <span style={{ fontSize: 14, fontWeight: reg.selected ? 600 : 500, color: reg.selected ? "#0f172a" : "#64748b", fontFamily: "'Inter',sans-serif" }}>{reg.name}</span>
+                                      </label>
+                                      
+                                      {reg.selected && (
+                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginLeft: 32, marginTop: 12 }}>
+                                          <div>
+                                            <label style={{ display: "block", fontSize: 10, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.05em", textTransform: "uppercase" as const, marginBottom: 4 }}>Min Alarm Threshold</label>
+                                            <input type="number" value={reg.alarm_min} onChange={(e) => updateBusCfgRegisterAlarm(di, ri, "alarm_min", e.target.value)}
+                                              placeholder="Optional" style={{ ...mInp, padding: "8px 12px", fontSize: 13 }} onFocus={(e) => e.target.style.borderColor = CLR.blue} onBlur={(e) => e.target.style.borderColor = "#e2e8f0"} />
+                                          </div>
+                                          <div>
+                                            <label style={{ display: "block", fontSize: 10, fontWeight: 600, color: "#94a3b8", letterSpacing: "0.05em", textTransform: "uppercase" as const, marginBottom: 4 }}>Max Alarm Threshold</label>
+                                            <input type="number" value={reg.alarm_max} onChange={(e) => updateBusCfgRegisterAlarm(di, ri, "alarm_max", e.target.value)}
+                                              placeholder="Optional" style={{ ...mInp, padding: "8px 12px", fontSize: 13 }} onFocus={(e) => e.target.style.borderColor = CLR.blue} onBlur={(e) => e.target.style.borderColor = "#e2e8f0"} />
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Error / success */}
+                {busCfgError   && <div style={{ padding: "12px 16px", background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 8, color: "#dc2626", fontSize: 14, marginTop: 24, display: "flex", alignItems: "center", gap: 8 }}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> {busCfgError}</div>}
+                {busCfgSuccess && <div style={{ padding: "12px 16px", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8, color: "#16a34a", fontSize: 14, marginTop: 24, display: "flex", alignItems: "center", gap: 8 }}><Check size={18} /> {busCfgSuccess}</div>}
+              </div>
 
               {/* Footer */}
               {!busCfgLoading && busCfgMachineId && (
-                <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-                  <button onClick={saveBusCfg} disabled={busCfgSaving}
-                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: 11, borderRadius: 8, background: "#2563eb", border: "none", color: "#fff", fontWeight: 600, fontSize: 14, cursor: busCfgSaving ? "not-allowed" : "pointer", opacity: busCfgSaving ? 0.65 : 1 }}>
-                    {busCfgSaving
-                      ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth={2.5} style={{ animation: "spin-login 1s linear infinite" }}><path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round" /></svg>
-                      : "Save & Deploy"}
+                <div style={{ padding: "20px 32px", borderTop: "1px solid #f1f5f9", display: "flex", gap: 12, background: "#ffffff", position: "sticky", bottom: 0, zIndex: 10, borderRadius: "0 0 24px 24px" }}>
+                  <button onClick={() => setBusCfgOpen(false)} style={{ padding: "12px 24px", borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", color: "#64748b", fontSize: 14, fontWeight: 600, cursor: "pointer", transition: "all 0.2s" }} onMouseOver={(e) => e.currentTarget.style.background = "#f1f5f9"} onMouseOut={(e) => e.currentTarget.style.background = "#f8fafc"}>
+                    Cancel
                   </button>
-                  <button onClick={() => setBusCfgOpen(false)} style={{ padding: "11px 18px", borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", color: "#64748b", fontSize: 13, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={saveBusCfg} disabled={busCfgSaving}
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 24px", borderRadius: 8, background: CLR.blue, border: "none", color: "#ffffff", fontWeight: 600, fontSize: 14, cursor: busCfgSaving ? "not-allowed" : "pointer", opacity: busCfgSaving ? 0.7 : 1, transition: "all 0.2s" }}
+                    onMouseOver={(e) => { if(!busCfgSaving) e.currentTarget.style.background = "#1550e6" }}
+                    onMouseOut={(e) => { if(!busCfgSaving) e.currentTarget.style.background = CLR.blue }}>
+                    {busCfgSaving
+                      ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth={2.5} style={{ animation: "spin-pv 1s linear infinite" }}><path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round" /></svg>
+                      : "Save & Deploy Configuration"}
+                  </button>
                 </div>
               )}
             </div>
