@@ -12,7 +12,8 @@
       "Bash(./node_modules/.bin/tsc --noEmit)",
       "Bash(npm run:*)",
       "Bash(node -e \"const http = require\\(''http''\\); const req = http.get\\(''http://localhost:5173/frames/frame_0001.webp'', \\(res\\) => { console.log\\(''Status:'', res.statusCode\\); console.log\\(''Content-Type:'', res.headers[''content-type'']\\); }\\); req.on\\(''error'', \\(e\\) => console.error\\(''Error:'', e.message\\)\\);\")",
-      "Bash(npm audit:*)"
+      "Bash(npm audit:*)",
+      "Bash(python3 -c ':*)"
     ]
   }
 }
