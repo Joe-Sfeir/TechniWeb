@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import type { CSSProperties } from "react";
 import { API_URL } from "../config";
 import { useNavigate } from "react-router-dom";
 import { handleAuthError } from "../lib/auth";
@@ -8,6 +9,51 @@ import {
   Activity, ChevronRight, AlertTriangle, RefreshCw,
   LayoutDashboard, Bell, Settings, Globe, Sun, Moon, Menu,
 } from "lucide-react";
+
+/* ─── Design Tokens ──────────────────────────────────────────────────────────── */
+const LIGHT_THEME = {
+  bg:        "#f8fafc",
+  surface:   "#ffffff",
+  border:    "#e2e8f0",
+  accent:    "#1a5fff",
+  accentDim: "#eff6ff",
+  text:      "#0f172a",
+  muted:     "#64748b",
+  muted2:    "#94a3b8",
+  danger:    "#ef4444",
+  dangerBg:  "#fef2f2",
+  dangerBdr: "#fecaca",
+  amber:     "#f59e0b",
+  amberBg:   "#fffbeb",
+  amberBdr:  "#fde68a",
+  green:     "#10b981",
+  greenBg:   "#ecfdf5",
+  greenBdr:  "#a7f3d0",
+  sidebar:   "#ffffff",
+  cardShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)",
+};
+
+const DARK_THEME = {
+  bg:        "#050505",
+  surface:   "#111111",
+  border:    "#222222",
+  accent:    "#1a5fff",
+  accentDim: "rgba(26, 95, 255, 0.1)",
+  text:      "#ffffff",
+  muted:     "#a1a1aa",
+  muted2:    "#52525b",
+  danger:    "#ef4444",
+  dangerBg:  "rgba(239, 68, 68, 0.1)",
+  dangerBdr: "rgba(239, 68, 68, 0.2)",
+  amber:     "#f59e0b",
+  amberBg:   "rgba(245, 158, 11, 0.1)",
+  amberBdr:  "rgba(245, 158, 11, 0.2)",
+  green:     "#10b981",
+  greenBg:   "rgba(16, 185, 129, 0.1)",
+  greenBdr:  "rgba(16, 185, 129, 0.2)",
+  sidebar:   "#0a0a0a",
+  cardShadow: "0 10px 30px -10px rgba(0, 0, 0, 0.5)",
+};
 
 /* ─── Types ───────────────────────────────────────────────────────────────── */
 
@@ -51,40 +97,58 @@ const TIER_COLORS: Record<string, string> = {
   "Tier 4": "#f59e0b",
 };
 
-const STATUS_COLOR: Record<string, string> = { online: "#22c55e", degraded: "#f59e0b", offline: "#ef4444" };
 const STATUS_LABEL: Record<string, string> = { online: "Online",  degraded: "Degraded", offline: "Offline"  };
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function Spinner({ color }: { color?: string }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={color || "currentColor"} strokeWidth={2.5}
+      style={{ animation: "spin 1s linear infinite" }}>
+      <path d="M12 2a10 10 0 1 0 10 10" strokeLinecap="round" />
+      <style>{`@keyframes spin { to { transform:rotate(360deg); } }`}</style>
+    </svg>
+  );
+}
+
+function SectionHeader({ title, sub, theme }: { title: string; sub?: string; theme: any }) {
+  return (
+    <div style={{ marginBottom: 32 }}>
+      <h2 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 24, color: theme.text, letterSpacing: "-0.02em", margin: 0 }}>{title}</h2>
+      {sub && <p style={{ fontSize: 14, color: theme.muted, marginTop: 6, marginBottom: 0 }}>{sub}</p>}
+    </div>
+  );
+}
+
+function DemoBanner({ theme }: { theme: any }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 16px", background: theme.amberBg, border: `1px solid ${theme.amberBdr}`, borderRadius: 8, marginBottom: 24, fontSize: 14 }}>
+      <span style={{ fontWeight: 600, color: theme.amber }}>Demo mode</span>
+      <span style={{ color: theme.muted }}>— backend offline, showing sample data</span>
+    </div>
+  );
+}
+
 /* ─── Dashboard ───────────────────────────────────────────────────────────── */
+
+type Tab = "projects" | "alerts" | "settings";
+
+const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  { id: "projects", label: "My Projects", icon: <LayoutDashboard size={18} /> },
+  { id: "alerts",   label: "Alerts",      icon: <Bell size={18} />            },
+  { id: "settings", label: "Settings",    icon: <Settings size={18} />        },
+];
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { dark, toggle } = useTheme();
+  const [tab, setTab] = useState<Tab>("projects");
   const [projects,     setProjects]     = useState<Project[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [isDemo,       setIsDemo]       = useState(false);
-  const [sidebarOpen,  setSidebarOpen]  = useState(false);
+  const [sidebarOpen,  setSidebarOpen]  = useState(true);
 
-  const CLR = dark ? {
-    bg:      "#0f172a",
-    bg2:     "#1e293b",
-    surface: "#1e293b",
-    border:  "#334155",
-    border2: "#1e293b",
-    fg:      "#f1f5f9",
-    fg2:     "#94a3b8",
-    accent:  "#1a5fff",
-    muted:   "#475569",
-  } : {
-    bg:      "#f8fafc",
-    bg2:     "#f1f5f9",
-    surface: "#ffffff",
-    border:  "#e2e8f0",
-    border2: "#f1f5f9",
-    fg:      "#0f172a",
-    fg2:     "#64748b",
-    accent:  "#1a5fff",
-    muted:   "#94a3b8",
-  };
+  const theme = dark ? DARK_THEME : LIGHT_THEME;
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -113,327 +177,239 @@ export default function Dashboard() {
     navigate("/login");
   };
 
-  const navItems = [
-    { icon: LayoutDashboard, label: "My Projects", active: true  },
-    { icon: Bell,            label: "Alerts",      active: false },
-    { icon: Settings,        label: "Settings",    active: false },
-  ];
+  const cardStyle: CSSProperties = {
+    background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: 12,
+    boxShadow: theme.cardShadow, overflow: "hidden"
+  };
 
-  const Sidebar = () => (
-    <aside style={{
-      width: 232, flexShrink: 0,
-      background: CLR.surface,
-      borderRight: `1px solid ${CLR.border}`,
-      display: "flex", flexDirection: "column",
-    }}>
-      {/* Logo */}
-      <div style={{ padding: "20px 18px 16px", borderBottom: `1px solid ${CLR.border2}` }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: 9,
-            background: CLR.accent,
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            boxShadow: `0 4px 12px ${CLR.accent}40`,
-          }}>
-            <Zap size={16} color="#fff" strokeWidth={2.5} />
-          </div>
-          <div>
-            <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: "0.95rem", color: CLR.fg, lineHeight: 1 }}>TechniDAQ</div>
-            <div style={{ fontSize: 10, color: CLR.fg2, letterSpacing: "0.06em", lineHeight: 1.5 }}>Client Portal</div>
-          </div>
-        </div>
-      </div>
+  const thStyle: CSSProperties = { textAlign: "left", padding: "14px 16px", color: theme.muted, fontWeight: 600, fontSize: 12, letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap", borderBottom: `1px solid ${theme.border}`, background: theme.bg };
+  const tdStyle: CSSProperties = { padding: "16px", color: theme.text, fontSize: 14, borderBottom: `1px solid ${theme.border}` };
 
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: "12px 10px", display: "flex", flexDirection: "column", gap: 2 }}>
-        {navItems.map((item) => (
-          <button key={item.label} style={{
-            display: "flex", alignItems: "center", gap: 10,
-            padding: "9px 12px", borderRadius: 8, width: "100%",
-            background: item.active ? `${CLR.accent}18` : "transparent",
-            border: "none",
-            borderLeft: item.active ? `3px solid ${CLR.accent}` : "3px solid transparent",
-            color: item.active ? CLR.accent : CLR.fg2,
-            fontFamily: "'Inter',sans-serif", fontWeight: item.active ? 600 : 500,
-            fontSize: "0.85rem",
-            cursor: "pointer", textAlign: "left", transition: "all 0.15s",
-          }}
-          onMouseEnter={(e) => { if (!item.active) { e.currentTarget.style.background = dark ? "#ffffff10" : "#f1f5f9"; e.currentTarget.style.color = CLR.fg; } }}
-          onMouseLeave={(e) => { if (!item.active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = CLR.fg2; } }}
-          >
-            <item.icon size={15} />
-            {item.label}
-          </button>
-        ))}
-      </nav>
-
-      {/* Bottom buttons */}
-      <div style={{ padding: "12px 10px", borderTop: `1px solid ${CLR.border2}`, display: "flex", flexDirection: "column", gap: 6 }}>
-        {/* Theme toggle */}
-        <button onClick={toggle} style={{
-          display: "flex", alignItems: "center", gap: 8, width: "100%",
-          padding: "9px 12px", borderRadius: 8,
-          background: "transparent", border: `1px solid ${CLR.border}`,
-          color: CLR.fg2, cursor: "pointer",
-          fontFamily: "'Inter',sans-serif", fontWeight: 500,
-          fontSize: "0.85rem", transition: "all 0.15s",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = `${CLR.accent}12`; e.currentTarget.style.borderColor = `${CLR.accent}50`; e.currentTarget.style.color = CLR.accent; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.fg2; }}
-        >
-          {dark ? <Sun size={14} /> : <Moon size={14} />}
-          {dark ? "Light Mode" : "Dark Mode"}
-        </button>
-        {/* Main Website */}
-        <button onClick={() => navigate("/")} style={{
-          display: "flex", alignItems: "center", gap: 8, width: "100%",
-          padding: "9px 12px", borderRadius: 8,
-          background: "transparent", border: `1px solid ${CLR.border}`,
-          color: CLR.fg2, cursor: "pointer",
-          fontFamily: "'Inter',sans-serif", fontWeight: 500,
-          fontSize: "0.85rem", transition: "all 0.15s",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = `${CLR.accent}12`; e.currentTarget.style.borderColor = `${CLR.accent}50`; e.currentTarget.style.color = CLR.accent; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.fg2; }}
-        >
-          <Globe size={14} /> Main Website
-        </button>
-        {/* Sign out */}
-        <button onClick={handleLogout} style={{
-          display: "flex", alignItems: "center", gap: 8, width: "100%",
-          padding: "9px 12px", borderRadius: 8,
-          background: "transparent", border: "1px solid #fca5a5",
-          color: "#ef4444", cursor: "pointer",
-          fontFamily: "'Inter',sans-serif", fontWeight: 500,
-          fontSize: "0.85rem", transition: "all 0.15s",
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = "#fef2f220"; e.currentTarget.style.borderColor = "#ef444460"; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "#fca5a5"; }}
-        >
-          <LogOut size={14} /> Sign Out
-        </button>
-      </div>
-    </aside>
-  );
+  const getStatusColor = (status: string) => {
+    if (status.toLowerCase() === 'online') return theme.green;
+    if (status.toLowerCase() === 'degraded') return theme.amber;
+    return theme.danger;
+  };
 
   return (
-    <>
+    <div style={{ minHeight: "100vh", display: "flex", fontFamily: "'Inter', sans-serif", background: theme.bg, color: theme.text, transition: "background 0.3s, color 0.3s" }}>
       <style>{`
-        *,*::before,*::after { box-sizing: border-box; }
-        body { margin: 0; }
-        @keyframes db-spin  { to { transform: rotate(360deg); } }
-        @keyframes db-pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
-        @keyframes pulse-dot{ 0%,100%{opacity:1} 50%{opacity:0.3}  }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .admin-fade { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
 
-      <div style={{ display: "flex", height: "100svh", background: CLR.bg, overflow: "hidden", fontFamily: "'Inter',system-ui,sans-serif" }}>
-
-        {/* ══ Sidebar — desktop ══ */}
-        <div style={{ display: "none" }} className="db-sidebar-desktop">
-          <Sidebar />
-        </div>
-        <style>{`
-          @media (min-width: 768px) { .db-sidebar-desktop { display: flex !important; } .db-mobile-bar { display: none !important; } }
-          @media (max-width: 767px) { .db-sidebar-desktop { display: none !important; } }
-        `}</style>
-
-        {/* ══ Mobile sidebar overlay ══ */}
-        {sidebarOpen && (
-          <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex" }}>
-            <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }} onClick={() => setSidebarOpen(false)} />
-            <div style={{ position: "relative", zIndex: 1 }}>
-              <Sidebar />
+      {/* Sidebar */}
+      <aside style={{
+        width: sidebarOpen ? 260 : 0,
+        flexShrink: 0,
+        background: theme.sidebar,
+        borderRight: `1px solid ${theme.border}`,
+        display: "flex",
+        flexDirection: "column",
+        transition: "width 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+        overflow: "hidden"
+      }}>
+        <div style={{ width: 260, display: "flex", flexDirection: "column", height: "100%" }}>
+          {/* Logo */}
+          <div style={{ padding: "32px 24px 24px", display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: theme.accent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: `0 4px 20px ${theme.accent}40` }}>
+              <Zap size={20} color="#fff" strokeWidth={2.5} />
             </div>
-          </div>
-        )}
-
-        {/* ══ Main ══ */}
-        <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column", minWidth: 0 }}>
-
-          {/* Mobile top bar */}
-          <div className="db-mobile-bar" style={{
-            padding: "14px 16px",
-            borderBottom: `1px solid ${CLR.border}`,
-            background: CLR.surface,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            flexShrink: 0,
-          }}>
-            <button onClick={() => setSidebarOpen(true)} style={{ background: "none", border: "none", cursor: "pointer", color: CLR.fg, padding: 4 }}>
-              <Menu size={20} />
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <div style={{ width: 26, height: 26, borderRadius: 7, background: CLR.accent, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <Zap size={12} color="#fff" strokeWidth={2.5} />
-              </div>
-              <span style={{ fontWeight: 700, fontSize: "0.9rem", color: CLR.fg }}>TechniDAQ</span>
-            </div>
-            <button onClick={toggle} style={{ background: "none", border: "none", cursor: "pointer", color: CLR.fg2, padding: 4 }}>
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </button>
-          </div>
-
-          {/* Top bar */}
-          <div style={{
-            padding: "20px 28px",
-            borderBottom: `1px solid ${CLR.border}`,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            background: CLR.surface, flexShrink: 0,
-          }}>
             <div>
-              <h1 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: "1.25rem", color: CLR.fg, letterSpacing: "-0.02em", margin: 0 }}>
-                My Projects
-              </h1>
-              <p style={{ fontSize: "0.75rem", color: CLR.fg2, margin: "3px 0 0" }}>
-                {loading ? "Loading…" : `${projects.length} site${projects.length !== 1 ? "s" : ""} connected`}
-              </p>
+              <div style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 800, fontSize: "1.1rem", color: theme.text, letterSpacing: "-0.02em" }}>TechniDAQ</div>
+              <div style={{ fontSize: 11, color: theme.muted, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: 600, marginTop: 2 }}>Client Portal</div>
             </div>
-            <button onClick={fetchProjects} disabled={loading} style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "8px 16px", borderRadius: 8,
-              background: "transparent", border: `1px solid ${CLR.border}`,
-              color: CLR.fg2, cursor: loading ? "not-allowed" : "pointer",
-              fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: "0.83rem",
-              transition: "all 0.15s", opacity: loading ? 0.6 : 1,
-            }}
-            onMouseEnter={(e) => { if (!loading) { e.currentTarget.style.background = `${CLR.accent}12`; e.currentTarget.style.borderColor = `${CLR.accent}50`; e.currentTarget.style.color = CLR.accent; } }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = CLR.border; e.currentTarget.style.color = CLR.fg2; }}
-            >
-              <RefreshCw size={13} style={{ animation: loading ? "db-spin 1s linear infinite" : "none" }} />
-              Refresh
-            </button>
           </div>
 
-          {/* Demo banner */}
-          {isDemo && (
-            <div style={{
-              margin: "16px 28px 0",
+          {/* Nav */}
+          <nav style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, padding: "0 16px" }}>
+            {NAV_ITEMS.map((item) => {
+              const active = tab === item.id;
+              return (
+                <button key={item.id} onClick={() => setTab(item.id)} style={{
+                  display: "flex", alignItems: "center", gap: 12, padding: "12px 16px",
+                  borderRadius: 8, border: "none",
+                  cursor: "pointer", textAlign: "left", fontFamily: "'Inter',sans-serif",
+                  fontSize: 14, fontWeight: active ? 600 : 500,
+                  background: active ? theme.accentDim : "transparent",
+                  color: active ? theme.accent : theme.muted,
+                  transition: "all 0.2s",
+                }}
+                  onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = theme.bg; e.currentTarget.style.color = theme.text; } }}
+                  onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = theme.muted; } }}
+                >
+                  {item.icon} {item.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Bottom */}
+          <div style={{ padding: "24px 16px", borderTop: `1px solid ${theme.border}`, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 8px 12px" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: theme.muted }}>CLIENT</span>
+              <button onClick={toggle} style={{ background: "none", border: "none", color: theme.muted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", padding: 4, borderRadius: 6 }} onMouseEnter={(e) => e.currentTarget.style.color = theme.text} onMouseLeave={(e) => e.currentTarget.style.color = theme.muted}>
+                {dark ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+            </div>
+            <button onClick={() => navigate("/")} style={{
+              display: "flex", alignItems: "center", gap: 10, width: "100%",
               padding: "10px 16px", borderRadius: 8,
-              background: dark ? "#451a0320" : "#fffbeb",
-              border: "1px solid #fde68a",
-              display: "flex", alignItems: "center", gap: 10,
-            }}>
-              <AlertTriangle size={13} style={{ color: "#d97706", flexShrink: 0 }} />
-              <span style={{ fontSize: "0.75rem", color: dark ? "#fde68a" : "#92400e" }}>
-                Demo mode — backend not connected. Showing sample projects.
-              </span>
+              background: "transparent", border: `1px solid ${theme.border}`,
+              color: theme.text, cursor: "pointer",
+              fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: 13,
+              transition: "all 0.2s",
+            }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = theme.bg; e.currentTarget.style.borderColor = theme.muted2; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = theme.border; }}
+            >
+              <Globe size={16} /> Main Website
+            </button>
+            <button onClick={handleLogout} style={{
+              display: "flex", alignItems: "center", gap: 10, width: "100%",
+              padding: "10px 16px", borderRadius: 8,
+              background: theme.dangerBg, border: `1px solid ${theme.dangerBdr}`,
+              color: theme.danger, cursor: "pointer",
+              fontFamily: "'Inter',sans-serif", fontWeight: 600, fontSize: 13,
+              transition: "all 0.2s",
+            }}
+              onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.8"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+            >
+              <LogOut size={16} /> Sign Out
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <main style={{ flex: 1, overflow: "auto", display: "flex", flexDirection: "column" }}>
+        {/* Header Toggle */}
+        <div style={{ padding: "24px 36px 0", display: "flex", alignItems: "center" }}>
+          <button onClick={() => setSidebarOpen(!sidebarOpen)} style={{ background: "none", border: "none", color: theme.muted, cursor: "pointer", padding: 8, marginLeft: -8, borderRadius: 6 }} onMouseEnter={(e) => e.currentTarget.style.background = theme.surface} onMouseLeave={(e) => e.currentTarget.style.background = "none"}>
+            <Menu size={20} />
+          </button>
+        </div>
+
+        <div style={{ padding: "16px 36px 48px", maxWidth: 1200, width: "100%", margin: "0 auto" }}>
+          {tab === "projects" && (
+            <div className="admin-fade">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
+                <div>
+                  <h2 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 24, color: theme.text, letterSpacing: "-0.02em", margin: 0 }}>My Projects</h2>
+                  <p style={{ fontSize: 14, color: theme.muted, marginTop: 6, marginBottom: 0 }}>
+                    {loading ? "Loading…" : `${projects.length} site${projects.length !== 1 ? "s" : ""} connected`}
+                  </p>
+                </div>
+                <button onClick={fetchProjects} disabled={loading} style={{
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 16px", borderRadius: 8,
+                  background: "transparent", border: `1px solid ${theme.border}`,
+                  color: theme.muted, cursor: loading ? "not-allowed" : "pointer",
+                  fontFamily: "'Inter',sans-serif", fontWeight: 500, fontSize: 13,
+                  transition: "all 0.2s", opacity: loading ? 0.6 : 1,
+                }}
+                onMouseEnter={(e) => { if (!loading) { e.currentTarget.style.background = theme.accentDim; e.currentTarget.style.borderColor = theme.accent; e.currentTarget.style.color = theme.accent; } }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = theme.border; e.currentTarget.style.color = theme.muted; }}
+                >
+                  {loading ? <Spinner color={theme.accent} /> : <RefreshCw size={14} />}
+                  Refresh
+                </button>
+              </div>
+
+              {isDemo && <DemoBanner theme={theme} />}
+
+              {projects.length > 0 ? (
+                <div style={{ ...cardStyle }}>
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                      <thead>
+                        <tr>
+                          <th style={thStyle}>Project</th>
+                          <th style={thStyle}>Location</th>
+                          <th style={thStyle}>Status</th>
+                          <th style={thStyle}>Devices</th>
+                          <th style={thStyle}>Alerts</th>
+                          <th style={thStyle}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {projects.map((p) => {
+                          const IconComp  = CATEGORY_ICONS[p.category] ?? Building2;
+                          const tierColor = TIER_COLORS[p.tier] ?? theme.muted2;
+                          const statColor = getStatusColor(p.status);
+
+                          return (
+                            <tr key={p.id} style={{ transition: "background 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.background = theme.bg} onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                              <td style={{ ...tdStyle, fontWeight: 600 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                  <div style={{
+                                    width: 32, height: 32, borderRadius: 8,
+                                    background: `${tierColor}18`, border: `1px solid ${tierColor}30`,
+                                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                                  }}>
+                                    <IconComp size={16} style={{ color: tierColor }} />
+                                  </div>
+                                  <div>
+                                    <div style={{ color: theme.text }}>{p.name}</div>
+                                    <div style={{ fontSize: 12, color: theme.muted, marginTop: 2 }}>{p.category} • {p.tier}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td style={{ ...tdStyle, color: theme.muted }}>{p.location}</td>
+                              <td style={tdStyle}>
+                                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 500, color: statColor }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: statColor }} />
+                                  {STATUS_LABEL[p.status]}
+                                </span>
+                              </td>
+                              <td style={{ ...tdStyle, color: theme.muted }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                  <Activity size={14} />
+                                  {p.deviceCount}
+                                </div>
+                              </td>
+                              <td style={tdStyle}>
+                                {p.activeAlerts > 0 ? (
+                                  <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 6, fontSize: 12, background: theme.dangerBg, color: theme.danger, border: `1px solid ${theme.dangerBdr}`, fontWeight: 600 }}>
+                                    <AlertTriangle size={12} />
+                                    {p.activeAlerts}
+                                  </span>
+                                ) : (
+                                  <span style={{ color: theme.muted2 }}>None</span>
+                                )}
+                              </td>
+                              <td style={tdStyle}>
+                                <button
+                                  onClick={() => navigate(`/dashboard/${p.id}`)}
+                                  style={{ display: "inline-flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${theme.border}`, borderRadius: 6, padding: "6px 12px", color: theme.text, fontSize: 13, cursor: "pointer", fontWeight: 500, transition: "all 0.2s" }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = theme.bg; e.currentTarget.style.borderColor = theme.muted2; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = theme.border; }}
+                                >
+                                  Open <ChevronRight size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                !loading && (
+                  <div style={{ ...cardStyle, padding: 40, textAlign: "center", color: theme.muted, fontSize: 14 }}>
+                    No projects found.
+                  </div>
+                )
+              )}
             </div>
           )}
 
-          {/* Project grid */}
-          <div style={{
-            padding: "20px 28px",
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 280px), 1fr))",
-            gap: 16,
-            alignContent: "start",
-          }}>
-            {loading ? (
-              Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} style={{
-                  borderRadius: 12, height: 172,
-                  background: CLR.bg2,
-                  animation: "db-pulse 1.5s ease-in-out infinite",
-                }} />
-              ))
-            ) : (
-              projects.map((project) => {
-                const IconComp  = CATEGORY_ICONS[project.category] ?? Building2;
-                const tierColor = TIER_COLORS[project.tier] ?? "#94a3b8";
-                const statColor = STATUS_COLOR[project.status];
-                return (
-                  <div
-                    key={project.id}
-                    onClick={() => navigate(`/dashboard/${project.id}`)}
-                    style={{
-                      borderRadius: 12, padding: "18px 20px",
-                      background: CLR.surface,
-                      border: `1px solid ${CLR.border}`,
-                      borderLeft: `4px solid ${tierColor}`,
-                      cursor: "pointer", position: "relative",
-                      transition: "all 0.2s",
-                      display: "flex", flexDirection: "column", gap: 12,
-                      boxShadow: dark ? "none" : "0 1px 3px rgba(0,0,0,0.05)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = dark
-                        ? `0 8px 24px rgba(0,0,0,0.4)`
-                        : `0 4px 16px rgba(0,0,0,0.1)`;
-                      const arrow = e.currentTarget.querySelector<HTMLElement>(".card-arrow");
-                      if (arrow) arrow.style.opacity = "1";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = dark ? "none" : "0 1px 3px rgba(0,0,0,0.05)";
-                      const arrow = e.currentTarget.querySelector<HTMLElement>(".card-arrow");
-                      if (arrow) arrow.style.opacity = "0";
-                    }}
-                  >
-                    {/* Icon + badges */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{
-                        width: 38, height: 38, borderRadius: 9,
-                        background: `${tierColor}18`, border: `1px solid ${tierColor}30`,
-                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                      }}>
-                        <IconComp size={17} style={{ color: tierColor }} />
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{
-                          padding: "3px 8px", borderRadius: 20,
-                          fontSize: 10, fontWeight: 700, letterSpacing: "0.04em",
-                          background: `${tierColor}18`, color: tierColor, border: `1px solid ${tierColor}30`,
-                        }}>{project.tier}</span>
-                        <div style={{
-                          display: "flex", alignItems: "center", gap: 5,
-                          padding: "3px 8px", borderRadius: 20,
-                          background: `${statColor}18`, border: `1px solid ${statColor}30`,
-                        }}>
-                          <div style={{
-                            width: 5, height: 5, borderRadius: "50%", background: statColor,
-                            animation: project.status === "online" ? "pulse-dot 2s ease-in-out infinite" : "none",
-                          }} />
-                          <span style={{ fontSize: 10, color: statColor, fontWeight: 600 }}>
-                            {STATUS_LABEL[project.status]}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Name + location */}
-                    <div>
-                      <h3 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: "0.93rem", color: CLR.fg, margin: "0 0 3px", letterSpacing: "-0.015em", lineHeight: 1.3 }}>
-                        {project.name}
-                      </h3>
-                      <p style={{ fontSize: "0.72rem", color: CLR.fg2, margin: 0 }}>
-                        {project.location}
-                      </p>
-                    </div>
-
-                    {/* Footer */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                        <Activity size={11} style={{ color: CLR.muted }} />
-                        <span style={{ fontSize: "0.7rem", color: CLR.muted }}>
-                          {project.deviceCount} device{project.deviceCount !== 1 ? "s" : ""}
-                        </span>
-                      </div>
-                      {project.activeAlerts > 0 && (
-                        <span style={{ padding: "2px 7px", borderRadius: 20, fontSize: 10, background: "#ef444420", color: "#ef4444", border: "1px solid #ef444430", fontWeight: 600 }}>
-                          {project.activeAlerts} alert{project.activeAlerts > 1 ? "s" : ""}
-                        </span>
-                      )}
-                      <span className="card-arrow" style={{ opacity: 0, transition: "opacity 0.15s", display: "flex", alignItems: "center", gap: 3, fontSize: "0.75rem", fontWeight: 600, color: tierColor }}>
-                        Open <ChevronRight size={12} />
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </main>
-      </div>
-    </>
+          {tab === "alerts" && <div className="admin-fade"><SectionHeader title="Alerts" sub="System notifications and warnings" theme={theme} /><div style={{ padding: 40, textAlign: "center", color: theme.muted, border: `1px solid ${theme.border}`, borderRadius: 12, background: theme.surface }}>This section is being updated to the new design system.</div></div>}
+          {tab === "settings" && <div className="admin-fade"><SectionHeader title="Settings" sub="Manage your account preferences" theme={theme} /><div style={{ padding: 40, textAlign: "center", color: theme.muted, border: `1px solid ${theme.border}`, borderRadius: 12, background: theme.surface }}>This section is being updated to the new design system.</div></div>}
+        </div>
+      </main>
+    </div>
   );
 }
