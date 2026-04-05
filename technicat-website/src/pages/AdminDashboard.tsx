@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Fragment } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus, Search, Send, Cpu, PlusCircle, Trash2, Upload, Sun, Moon, Menu } from "lucide-react";
+import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus, Search, Send, Cpu, PlusCircle, Trash2, Upload, Sun, Moon, Menu, GitBranch } from "lucide-react";
 import { getToken, getRole, clearAuth, handleAuthError } from "../lib/auth";
 import { API_URL } from "../config";
 import { useTheme } from "../context/ThemeContext";
@@ -2558,16 +2558,229 @@ function MeterProfilesTab({ theme }: { theme: any }) {
   );
 }
 
+// ─── DevOps Tab ───────────────────────────────────────────────────────────────
+
+interface DevBranchInfo { sha: string; message: string; author: string; date: string; }
+interface DevRepoStatus { name: string; label: string; url: string; main: DevBranchInfo; dev: DevBranchInfo; devAhead: number; devBehind: number; }
+interface DevAppVersion { version: string; notes: string; url: string; }
+interface DevOpsData    { repos: DevRepoStatus[]; appVersion: DevAppVersion; }
+
+function DevOpsTab({ theme }: { theme: any }) {
+  const navigate = useNavigate();
+  const [data,          setData]          = useState<DevOpsData | null>(null);
+  const [loading,       setLoading]       = useState(true);
+  const [error503,      setError503]      = useState(false);
+  const [lastUpdated,   setLastUpdated]   = useState<Date | null>(null);
+  const [showForm,      setShowForm]      = useState(false);
+  const [form,          setForm]          = useState({ version: "", notes: "", url: "" });
+  const [publishing,    setPublishing]    = useState(false);
+  const [publishMsg,    setPublishMsg]    = useState<{ ok: boolean; text: string } | null>(null);
+
+  function relativeTime(iso: string): string {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60_000);
+    if (mins < 1)  return "just now";
+    if (mins < 60) return `${mins} minute${mins !== 1 ? "s" : ""} ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs  < 24) return `${hrs} hour${hrs !== 1 ? "s" : ""} ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days} day${days !== 1 ? "s" : ""} ago`;
+  }
+
+  async function fetchData() {
+    const token = getToken();
+    const res = await fetch(`${API_BASE}/api/admin/devops/repo-status`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (handleAuthError(res, navigate)) return;
+    if (res.status === 503) { setError503(true); setLoading(false); return; }
+    if (!res.ok) throw new Error("Server error");
+    const d: DevOpsData = await res.json();
+    setData(d);
+    setLastUpdated(new Date());
+    setError503(false);
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    fetchData().catch(() => setLoading(false));
+    const id = setInterval(() => { fetchData().catch(() => {}); }, 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  async function handlePublish(e: React.FormEvent) {
+    e.preventDefault();
+    setPublishing(true);
+    try {
+      const token = getToken();
+      const res = await fetch(`${API_BASE}/api/admin/devops/publish-update`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(form),
+      });
+      if (handleAuthError(res, navigate)) return;
+      if (!res.ok) throw new Error("Failed");
+      setPublishMsg({ ok: true, text: "Published successfully" });
+      setShowForm(false);
+      setForm({ version: "", notes: "", url: "" });
+      await fetchData();
+    } catch {
+      setPublishMsg({ ok: false, text: "Failed to publish update" });
+    } finally {
+      setPublishing(false);
+      setTimeout(() => setPublishMsg(null), 4000);
+    }
+  }
+
+  if (loading) return <div style={{ display: "flex", justifyContent: "center", padding: 40 }}><Spinner color={theme.accent} /></div>;
+
+  if (error503) return (
+    <div style={{ padding: "16px 20px", background: theme.amberBg, border: `1px solid ${theme.amberBdr}`, borderRadius: 12, color: theme.amber, fontSize: 14 }}>
+      GitHub token not configured on server. Add GITHUB_TOKEN env var in Railway.
+    </div>
+  );
+
+  const inputStyle: CSSProperties = { width: "100%", padding: "9px 12px", background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, color: theme.text, fontSize: 14, fontFamily: "'Inter',sans-serif", boxSizing: "border-box" };
+
+  return (
+    <div style={{ animation: "fadeIn 0.3s ease" }}>
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 32 }}>
+        <div>
+          <h2 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 24, color: theme.text, letterSpacing: "-0.02em", margin: 0 }}>DevOps</h2>
+          <p style={{ fontSize: 14, color: theme.muted, marginTop: 6, marginBottom: 0 }}>App version and repository status</p>
+        </div>
+        {lastUpdated && (
+          <span style={{ fontSize: 12, color: theme.muted2, marginTop: 6 }}>Last updated: {lastUpdated.toLocaleTimeString()}</span>
+        )}
+      </div>
+
+      {/* Published App Version */}
+      {data && (
+        <div style={{ ...card(theme), padding: 24, marginBottom: 32 }}>
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Published App Version</div>
+              <div style={{ fontSize: 36, fontWeight: 700, color: theme.accent, letterSpacing: "-0.03em", marginBottom: 8, lineHeight: 1 }}>v{data.appVersion.version}</div>
+              {data.appVersion.notes && (
+                <div style={{ fontSize: 14, color: theme.muted, marginBottom: 12 }}>{data.appVersion.notes}</div>
+              )}
+              {data.appVersion.url && (
+                <a href={data.appVersion.url} target="_blank" rel="noopener noreferrer" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 13, color: theme.accent, textDecoration: "none", fontWeight: 500 }}>
+                  <ExternalLink size={13} /> {data.appVersion.url}
+                </a>
+              )}
+            </div>
+            <button onClick={() => setShowForm((v) => !v)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", background: theme.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'Inter',sans-serif", flexShrink: 0 }}>
+              <Upload size={15} /> Publish New Version
+            </button>
+          </div>
+
+          {showForm && (
+            <form onSubmit={handlePublish} style={{ borderTop: `1px solid ${theme.border}`, paddingTop: 20, marginTop: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: theme.muted, display: "block", marginBottom: 6 }}>Version</label>
+                  <input value={form.version} onChange={(e) => setForm((p) => ({ ...p, version: e.target.value }))} placeholder="e.g. 1.2.3" required style={inputStyle} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 12, fontWeight: 600, color: theme.muted, display: "block", marginBottom: 6 }}>Download URL</label>
+                  <input value={form.url} onChange={(e) => setForm((p) => ({ ...p, url: e.target.value }))} placeholder="https://..." required style={inputStyle} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: theme.muted, display: "block", marginBottom: 6 }}>Release Notes</label>
+                <textarea value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="What's new in this version…" rows={3} style={{ ...inputStyle, resize: "vertical" } as CSSProperties} />
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <button type="submit" disabled={publishing} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", background: publishing ? "rgba(26,95,255,0.55)" : theme.accent, color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: publishing ? "wait" : "pointer", fontFamily: "'Inter',sans-serif", opacity: publishing ? 0.7 : 1 }}>
+                  {publishing ? <Spinner color="#fff" /> : <Send size={14} />} Publish
+                </button>
+                <button type="button" onClick={() => setShowForm(false)} style={{ padding: "10px 18px", background: "transparent", border: `1px solid ${theme.border}`, borderRadius: 8, color: theme.muted, fontSize: 13, cursor: "pointer", fontFamily: "'Inter',sans-serif" }}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {publishMsg && (
+        <div style={{ padding: "12px 16px", background: publishMsg.ok ? theme.greenBg : theme.dangerBg, border: `1px solid ${publishMsg.ok ? theme.greenBdr : theme.dangerBdr}`, borderRadius: 8, color: publishMsg.ok ? theme.green : theme.danger, fontSize: 14, marginBottom: 24 }}>
+          {publishMsg.text}
+        </div>
+      )}
+
+      {/* Repository Status */}
+      {data && (
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 600, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Repository Status</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {data.repos.map((repo) => (
+              <div key={repo.name} style={{ ...card(theme), padding: 24 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+                  <div>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: theme.text }}>{repo.name}</span>
+                    <span style={{ fontSize: 13, color: theme.muted, marginLeft: 8 }}>— {repo.label}</span>
+                  </div>
+                  <a href={repo.url} target="_blank" rel="noopener noreferrer" style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: theme.accent, textDecoration: "none", fontWeight: 500 }}>
+                    <ExternalLink size={12} /> GitHub
+                  </a>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 16, alignItems: "center" }}>
+                  {/* main */}
+                  <div style={{ background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: "14px 16px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>main</div>
+                    <div style={{ fontSize: 13, color: theme.text, fontWeight: 500, marginBottom: 6, lineHeight: 1.4 }}>
+                      {repo.main.message.length > 60 ? repo.main.message.slice(0, 60) + "…" : repo.main.message}
+                    </div>
+                    <div style={{ fontSize: 12, color: theme.muted2 }}>{repo.main.author} · {relativeTime(repo.main.date)}</div>
+                  </div>
+                  {/* badge */}
+                  <div style={{ display: "flex", justifyContent: "center" }}>
+                    {repo.devAhead === 0 ? (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: theme.muted2, background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 20, padding: "5px 12px", whiteSpace: "nowrap" }}>
+                        In sync
+                      </span>
+                    ) : repo.devBehind === 0 ? (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: theme.green, background: theme.greenBg, border: `1px solid ${theme.greenBdr}`, borderRadius: 20, padding: "5px 12px", whiteSpace: "nowrap" }}>
+                        ✓ {repo.devAhead} commit{repo.devAhead !== 1 ? "s" : ""} ahead — ready to merge
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, fontWeight: 600, color: theme.amber, background: theme.amberBg, border: `1px solid ${theme.amberBdr}`, borderRadius: 20, padding: "5px 12px", whiteSpace: "nowrap" }}>
+                        ⚠ {repo.devAhead} ahead, {repo.devBehind} behind — needs rebase
+                      </span>
+                    )}
+                  </div>
+                  {/* dev */}
+                  <div style={{ background: theme.bg, border: `1px solid ${theme.border}`, borderRadius: 8, padding: "14px 16px" }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>dev</div>
+                    <div style={{ fontSize: 13, color: theme.text, fontWeight: 500, marginBottom: 6, lineHeight: 1.4 }}>
+                      {repo.dev.message.length > 60 ? repo.dev.message.slice(0, 60) + "…" : repo.dev.message}
+                    </div>
+                    <div style={{ fontSize: 12, color: theme.muted2 }}>{repo.dev.author} · {relativeTime(repo.dev.date)}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main AdminDashboard ──────────────────────────────────────────────────────
-type Tab = "fleet" | "clients" | "create" | "online-projects" | "licenses" | "meter-profiles";
+type Tab = "fleet" | "clients" | "create" | "online-projects" | "licenses" | "meter-profiles" | "devops";
 
 const NAV_ITEMS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: "fleet",           label: "Global Fleet",      icon: <Globe size={18} />    },
-  { id: "clients",         label: "Client Management", icon: <Users size={18} />    },
-  { id: "create",          label: "Create User",       icon: <UserPlus size={18} /> },
-  { id: "online-projects", label: "Online Projects",   icon: <Zap size={18} />      },
-  { id: "licenses",        label: "Offline Licenses",  icon: <Key size={18} />      },
-  { id: "meter-profiles",  label: "Meter Profiles",    icon: <Cpu size={18} />      },
+  { id: "fleet",           label: "Global Fleet",      icon: <Globe size={18} />       },
+  { id: "clients",         label: "Client Management", icon: <Users size={18} />       },
+  { id: "create",          label: "Create User",       icon: <UserPlus size={18} />    },
+  { id: "online-projects", label: "Online Projects",   icon: <Zap size={18} />         },
+  { id: "licenses",        label: "Offline Licenses",  icon: <Key size={18} />         },
+  { id: "meter-profiles",  label: "Meter Profiles",    icon: <Cpu size={18} />         },
+  { id: "devops",          label: "DevOps",            icon: <GitBranch size={18} />   },
 ];
 
 export default function AdminDashboard() {
@@ -2709,6 +2922,7 @@ export default function AdminDashboard() {
           {tab === "online-projects" && <OnlineProjectsTab meterOptions={meterOptions} theme={theme} />}
           {tab === "licenses"        && <LicenseTab meterOptions={meterOptions} theme={theme} />}
           {tab === "meter-profiles"  && <MeterProfilesTab theme={theme} />}
+          {tab === "devops"          && <DevOpsTab theme={theme} />}
         </div>
       </main>
     </div>
