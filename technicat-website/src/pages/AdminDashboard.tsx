@@ -1,7 +1,7 @@
 import React, { useState, useEffect, Fragment } from "react";
 import type { CSSProperties } from "react";
 import { useNavigate } from "react-router-dom";
-import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus, Search, Send, Cpu, PlusCircle, Trash2, Upload, Sun, Moon, Menu, GitBranch } from "lucide-react";
+import { Zap, Globe, Users, Key, LogOut, Copy, Check, X, RefreshCw, ExternalLink, UserPlus, Search, Send, Cpu, PlusCircle, Trash2, Upload, Sun, Moon, Menu, GitBranch, ChevronDown } from "lucide-react";
 import { getToken, getRole, clearAuth, handleAuthError } from "../lib/auth";
 import { API_URL } from "../config";
 import { useTheme } from "../context/ThemeContext";
@@ -2575,6 +2575,7 @@ function DevOpsTab({ theme }: { theme: any }) {
   const [form,          setForm]          = useState({ version: "", notes: "", url: "" });
   const [publishing,    setPublishing]    = useState(false);
   const [publishMsg,    setPublishMsg]    = useState<{ ok: boolean; text: string } | null>(null);
+  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
   function relativeTime(iso: string): string {
     const diff = Date.now() - new Date(iso).getTime();
@@ -2711,9 +2712,174 @@ function DevOpsTab({ theme }: { theme: any }) {
         </div>
       )}
 
+      {/* Release Guide */}
+      <div style={{ marginTop: 48 }}>
+        {/* Section header */}
+        <div style={{ marginBottom: 24 }}>
+          <h3 style={{ fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", fontWeight: 700, fontSize: 20, color: theme.text, letterSpacing: "-0.02em", margin: 0 }}>OTA Release Checklist</h3>
+          <p style={{ fontSize: 14, color: theme.muted, marginTop: 6, marginBottom: 0 }}>Follow these steps exactly every time you publish a new TechniDAQ version.</p>
+        </div>
+
+        {/* Step table */}
+        <div style={{ overflowX: "auto", borderRadius: 12, border: `1px solid ${theme.border}`, marginBottom: 24 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", background: theme.surface, fontSize: 14 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap", width: 60 }}>#</th>
+                <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap", width: 200 }}>Action</th>
+                <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 11, fontWeight: 700, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Step 1 */}
+              <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: theme.accent, color: "#fff", borderRadius: 6, fontWeight: 700, fontSize: 13 }}>1</span>
+                </td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", fontWeight: 600, color: theme.text, whiteSpace: "nowrap" }}>Bump version in 3 files</td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", color: theme.muted, lineHeight: 1.7 }}>
+                  Open these 3 files and change the version string to the new version (e.g. <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>0.2.0</code> → <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>0.3.0</code>). All 3 MUST match:
+                  <br /><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>src-tauri/tauri.conf.json</code> → <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>"version": "X.Y.Z"</code>
+                  <br /><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>src-tauri/Cargo.toml</code> → <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>version = "X.Y.Z"</code>
+                  <br /><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>package.json</code> (repo root) → <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>"version": "X.Y.Z"</code>
+                </td>
+              </tr>
+              {/* Step 2 */}
+              <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: theme.accent, color: "#fff", borderRadius: 6, fontWeight: 700, fontSize: 13 }}>2</span>
+                </td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", fontWeight: 600, color: theme.text, whiteSpace: "nowrap" }}>Commit your code changes</td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", color: theme.muted, lineHeight: 1.7 }}>
+                  <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>git add -A && git commit -m "release: vX.Y.Z — description"</code>
+                  <br />Make sure all your feature/fix code is committed to <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>dev</code> before building.
+                </td>
+              </tr>
+              {/* Step 3 */}
+              <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: theme.accent, color: "#fff", borderRadius: 6, fontWeight: 700, fontSize: 13 }}>3</span>
+                </td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", fontWeight: 600, color: theme.text, whiteSpace: "nowrap" }}>Set signing key in terminal</td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", color: theme.muted, lineHeight: 1.7 }}>
+                  Open PowerShell in the <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>powermeter-demo</code> repo root and run:
+                  <br /><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>$env:TAURI_SIGNING_PRIVATE_KEY = Get-Content "$HOME\.tauri\technidaq.key" -Raw</code>
+                  <br />then <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""</code>
+                  <br />These must be set in the <strong style={{ color: theme.text }}>SAME terminal session</strong> where you build.
+                </td>
+              </tr>
+              {/* Step 4 */}
+              <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: theme.accent, color: "#fff", borderRadius: 6, fontWeight: 700, fontSize: 13 }}>4</span>
+                </td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", fontWeight: 600, color: theme.text, whiteSpace: "nowrap" }}>Build the signed release</td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", color: theme.muted, lineHeight: 1.7 }}>
+                  Run: <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>pnpm tauri build --features cloud_sync</code>
+                  <br />Takes 5–10 minutes. Wait until you see: <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>Finished 2 updater signatures at: ...\nsis\TechniDAQ_X.Y.Z_x64-setup.exe.sig</code>
+                  <br />If no <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>.sig</code> line appears, the signing failed. Check that the env vars from Step 3 are set.
+                </td>
+              </tr>
+              {/* Step 5 */}
+              <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: theme.accent, color: "#fff", borderRadius: 6, fontWeight: 700, fontSize: 13 }}>5</span>
+                </td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", fontWeight: 600, color: theme.text, whiteSpace: "nowrap" }}>Verify build output</td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", color: theme.muted, lineHeight: 1.7 }}>
+                  Open <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>src-tauri\target\release\bundle\nsis\</code> in File Explorer. You MUST see 2 files:
+                  <br /><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>TechniDAQ_X.Y.Z_x64-setup.exe</code> (~15–30 MB) and <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>TechniDAQ_X.Y.Z_x64-setup.exe.sig</code> (~1 KB).
+                  <br />If the <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>.sig</code> is missing, do <strong style={{ color: theme.danger }}>NOT</strong> proceed — go back to Step 3.
+                </td>
+              </tr>
+              {/* Step 6 */}
+              <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: theme.accent, color: "#fff", borderRadius: 6, fontWeight: 700, fontSize: 13 }}>6</span>
+                </td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", fontWeight: 600, color: theme.text, whiteSpace: "nowrap" }}>Run the publish script</td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", color: theme.muted, lineHeight: 1.7 }}>
+                  Double-click <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>publish-update.bat</code> in the repo root (or run <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>.\publish-update.ps1</code> in PowerShell).
+                  <br />It will: confirm the version → find the .exe and .sig → ask for release notes → create GitHub Release → upload files → notify cloud API.
+                  <br />Type <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>Y</code> to confirm, enter release notes, done.
+                </td>
+              </tr>
+              {/* Step 7 */}
+              <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: theme.accent, color: "#fff", borderRadius: 6, fontWeight: 700, fontSize: 13 }}>7</span>
+                </td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", fontWeight: 600, color: theme.text, whiteSpace: "nowrap" }}>Verify on GitHub</td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", color: theme.muted, lineHeight: 1.7 }}>
+                  Open <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>https://github.com/Joe-Sfeir/TechniDAQ/releases/latest</code>
+                  <br />Confirm tag is <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>vX.Y.Z</code>, assets include the <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>.exe</code> and <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>latest.json</code>.
+                  <br />Click <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>latest.json</code> and check the <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>version</code> field matches.
+                </td>
+              </tr>
+              {/* Step 8 */}
+              <tr style={{ borderBottom: `1px solid ${theme.border}` }}>
+                <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: theme.accent, color: "#fff", borderRadius: 6, fontWeight: 700, fontSize: 13 }}>8</span>
+                </td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", fontWeight: 600, color: theme.text, whiteSpace: "nowrap" }}>Test on a live app</td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", color: theme.muted, lineHeight: 1.7 }}>
+                  Open TechniDAQ on any machine with an older version. Within 5 seconds a blue "Update Available" banner should appear.
+                  <br />Click "Install Now" — the app downloads, installs, and restarts automatically. Verify the new version is running.
+                </td>
+              </tr>
+              {/* Step 9 */}
+              <tr>
+                <td style={{ padding: "14px 16px", verticalAlign: "top" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, background: theme.accent, color: "#fff", borderRadius: 6, fontWeight: 700, fontSize: 13 }}>9</span>
+                </td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", fontWeight: 600, color: theme.text, whiteSpace: "nowrap" }}>Push and merge</td>
+                <td style={{ padding: "14px 16px", verticalAlign: "top", color: theme.muted, lineHeight: 1.7 }}>
+                  <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>git push origin dev</code>
+                  <br />If this is production-ready: <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>git checkout main && git merge dev && git push origin main && git checkout dev</code>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Troubleshooting collapsible */}
+        <div style={{ border: `1px solid ${theme.border}`, borderRadius: 12, marginBottom: 24, overflow: "hidden" }}>
+          <div
+            onClick={() => setShowTroubleshooting((v) => !v)}
+            style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", cursor: "pointer", userSelect: "none", background: theme.surface }}
+          >
+            <span style={{ fontWeight: 600, fontSize: 14, color: theme.text }}>Troubleshooting</span>
+            <ChevronDown size={16} color={theme.muted} style={{ transition: "transform 0.2s", transform: showTroubleshooting ? "rotate(180deg)" : "rotate(0deg)" }} />
+          </div>
+          {showTroubleshooting && (
+            <div style={{ borderTop: `1px solid ${theme.border}`, padding: "20px 20px", background: theme.surface, display: "flex", flexDirection: "column", gap: 14 }}>
+              {[
+                { problem: "No .sig file after build", solution: <><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>TAURI_SIGNING_PRIVATE_KEY</code> env var not set in the terminal, or <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>createUpdaterArtifacts</code> is missing from <code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>tauri.conf.json</code>. Re-run Step 3 then Step 4.</> },
+                { problem: "publish-update.ps1 says \"Build artifacts not found\"", solution: "You haven't built yet or the build failed. Run Step 4 first." },
+                { problem: "GitHub release fails: \"tag already exists\"", solution: "You already published this version. Delete the old release on GitHub (Releases → find it → Delete → also delete the tag), or bump to a newer version." },
+                { problem: "No update banner on desktop app", solution: <><span>App must be an online </span><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>cloud_sync</code><span> build, connected to a project, actively ingesting. Check that the cloud API was notified (Step 6 should print success). The version check happens inside the ingest response.</span></> },
+                { problem: "\"Install Now\" clicked but nothing happens", solution: <><span>Open DevTools (right-click → Inspect → Console). Look for signature mismatch or download errors. Verify </span><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>https://github.com/Joe-Sfeir/TechniDAQ/releases/latest/download/latest.json</code><span> returns valid JSON in browser.</span></> },
+                { problem: "Signature verification failed", solution: "The .sig was generated with a different key than the pubkey baked into the installed app. If you regenerated your signing key, existing installs can't update via OTA — they need manual reinstall." },
+                { problem: "GitHub token expired", solution: <><span>Delete </span><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>$HOME\.technidaq-github-token</code><span> and re-run the publish script. It will prompt for a new token. Generate one at GitHub → Settings → Developer settings → Personal access tokens (needs </span><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>repo</code><span> scope).</span></> },
+                { problem: "Admin JWT expired", solution: <><span>Delete </span><code style={{ fontFamily: "'Share Tech Mono',monospace", background: theme.bg, padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: theme.text }}>$HOME\.technidaq-admin-token</code><span> and re-run. Or notify manually from this dashboard's DevOps tab.</span></> },
+              ].map(({ problem, solution }, i) => (
+                <div key={i} style={{ fontSize: 14, color: theme.muted, lineHeight: 1.6 }}>
+                  <strong style={{ color: theme.text }}>{problem}</strong> → {solution}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Critical Files warning card */}
+        <div style={{ border: `1px solid ${theme.dangerBdr}`, background: theme.dangerBg, borderRadius: 12, padding: "16px 20px", color: theme.danger, fontSize: 14, lineHeight: 1.6 }}>
+          <strong>NEVER lose your private signing key</strong> at <code style={{ fontFamily: "'Share Tech Mono',monospace", background: "rgba(0,0,0,0.08)", padding: "2px 6px", borderRadius: 4, fontSize: "0.75rem", color: "inherit" }}>$HOME\.tauri\technidaq.key</code>. If lost, you can never push OTA updates to existing users — they'd all need to manually reinstall. Back it up to a USB drive or password manager.
+        </div>
+      </div>
+
       {/* Repository Status */}
       {data && (
-        <div>
+        <div style={{ marginTop: 48 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: theme.muted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Repository Status</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             {data.repos.map((repo) => (
